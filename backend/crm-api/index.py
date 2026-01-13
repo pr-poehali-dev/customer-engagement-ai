@@ -33,10 +33,20 @@ def handler(event: dict, context) -> dict:
         qs_params = event.get('queryStringParameters')
         path = qs_params.get('path', 'stats') if qs_params else 'stats'
         
-        if path == 'initiate_call' and method == 'POST':
+        if method == 'POST':
             body_str = event.get('body', '{}')
             body = json.loads(body_str) if isinstance(body_str, str) else body_str
-            result = initiate_call(cursor, conn, body)
+            
+            if path == 'initiate_call':
+                result = initiate_call(cursor, conn, body)
+            elif path == 'import_clients':
+                result = import_clients(cursor, conn, body)
+            elif path == 'save_scenario':
+                result = save_scenario(cursor, conn, body)
+            elif path == 'delete_scenario':
+                result = delete_scenario(cursor, conn, body)
+            else:
+                result = {'error': 'Unknown POST path'}
         elif path == 'stats':
             result = get_stats(cursor)
         elif path == 'clients':
@@ -45,6 +55,8 @@ def handler(event: dict, context) -> dict:
             result = get_calls(cursor)
         elif path == 'campaigns':
             result = get_campaigns(cursor)
+        elif path == 'scenarios':
+            result = get_scenarios(cursor)
         else:
             result = {'error': 'Unknown path'}
         
@@ -138,6 +150,126 @@ def get_campaigns(cursor):
     """)
     
     return cursor.fetchall()
+
+
+def get_scenarios(cursor):
+    cursor.execute("""
+        SELECT 
+            id,
+            name,
+            description,
+            steps,
+            status,
+            TO_CHAR(created_at, 'DD.MM.YYYY') as created
+        FROM scenarios
+        ORDER BY created_at DESC
+    """)
+    
+    return cursor.fetchall()
+
+
+def import_clients(cursor, conn, body):
+    '''Импортирует клиентов из Excel файла'''
+    
+    if not isinstance(body, dict):
+        return {'error': 'Invalid body format'}
+    
+    clients = body.get('clients', [])
+    
+    if not clients:
+        return {'error': 'No clients provided'}
+    
+    imported_count = 0
+    for client in clients:
+        try:
+            cursor.execute("""
+                INSERT INTO clients (name, email, phone, status, last_contact)
+                VALUES (%s, %s, %s, %s, NOW())
+            """, (
+                client.get('name', ''),
+                client.get('email', ''),
+                client.get('phone', ''),
+                client.get('status', 'cold')
+            ))
+            imported_count += 1
+        except Exception as e:
+            print(f'Error importing client: {e}')
+            continue
+    
+    conn.commit()
+    
+    return {
+        'success': True,
+        'imported': imported_count,
+        'message': f'Импортировано {imported_count} клиентов'
+    }
+
+
+def save_scenario(cursor, conn, body):
+    '''Сохраняет или обновляет сценарий AI бота'''
+    
+    if not isinstance(body, dict):
+        return {'error': 'Invalid body format'}
+    
+    scenario = body.get('scenario')
+    
+    if not scenario:
+        return {'error': 'No scenario provided'}
+    
+    scenario_id = scenario.get('id')
+    name = scenario.get('name', 'Новый сценарий')
+    description = scenario.get('description', '')
+    steps = json.dumps(scenario.get('steps', []))
+    status = scenario.get('status', 'draft')
+    
+    cursor.execute("""
+        SELECT id FROM scenarios WHERE id = %s
+    """, (scenario_id,))
+    
+    existing = cursor.fetchone()
+    
+    if existing:
+        cursor.execute("""
+            UPDATE scenarios 
+            SET name = %s, description = %s, steps = %s, status = %s, updated_at = NOW()
+            WHERE id = %s
+        """, (name, description, steps, status, scenario_id))
+    else:
+        cursor.execute("""
+            INSERT INTO scenarios (id, name, description, steps, status, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+        """, (scenario_id, name, description, steps, status))
+    
+    conn.commit()
+    
+    return {
+        'success': True,
+        'scenario_id': scenario_id,
+        'message': 'Сценарий сохранен'
+    }
+
+
+def delete_scenario(cursor, conn, body):
+    '''Удаляет сценарий'''
+    
+    if not isinstance(body, dict):
+        return {'error': 'Invalid body format'}
+    
+    scenario_id = body.get('scenario_id')
+    
+    if not scenario_id:
+        return {'error': 'scenario_id is required'}
+    
+    cursor.execute("""
+        DELETE FROM scenarios WHERE id = %s
+    """, (scenario_id,))
+    
+    conn.commit()
+    
+    return {
+        'success': True,
+        'message': 'Сценарий удален'
+    }
 
 
 def initiate_call(cursor, conn, body):

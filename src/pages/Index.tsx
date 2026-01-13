@@ -14,6 +14,7 @@ import { DashboardTab } from '@/components/DashboardTab';
 import { ClientsTab } from '@/components/ClientsTab';
 import { CallsTab } from '@/components/CallsTab';
 import { EmailsTab } from '@/components/EmailsTab';
+import { ScenarioBuilder } from '@/components/ScenarioBuilder';
 
 const API_URL = 'https://functions.poehali.dev/0c17e1a7-ce1b-49a9-9ef7-f7cb2df73405';
 
@@ -30,6 +31,7 @@ const Index = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [emailCampaigns, setEmailCampaigns] = useState<any[]>([]);
   const [callingInProgress, setCallingInProgress] = useState<{[key: number]: boolean}>({});
+  const [scenarios, setScenarios] = useState<any[]>([]);
 
   useEffect(() => {
     loadData();
@@ -38,22 +40,25 @@ const Index = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [statsRes, callsRes, clientsRes, campaignsRes] = await Promise.all([
+      const [statsRes, callsRes, clientsRes, campaignsRes, scenariosRes] = await Promise.all([
         fetch(`${API_URL}?path=stats`),
         fetch(`${API_URL}?path=calls`),
         fetch(`${API_URL}?path=clients`),
-        fetch(`${API_URL}?path=campaigns`)
+        fetch(`${API_URL}?path=campaigns`),
+        fetch(`${API_URL}?path=scenarios`)
       ]);
 
       const statsData = await statsRes.json();
       const callsData = await callsRes.json();
       const clientsData = await clientsRes.json();
       const campaignsData = await campaignsRes.json();
+      const scenariosData = await scenariosRes.json();
 
       setStats(statsData);
       setRecentCalls(callsData);
       setClients(clientsData);
       setEmailCampaigns(campaignsData);
+      setScenarios(scenariosData);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -72,6 +77,63 @@ const Index = () => {
       case 'active': return 'bg-green-500/20 text-green-400 border-green-500/50';
       case 'completed': return 'bg-gray-500/20 text-gray-400 border-gray-500/50';
       default: return 'bg-gray-500/20 text-gray-400';
+    }
+  };
+
+  const handleImportClients = async (importedClients: any[]) => {
+    try {
+      const response = await fetch(`${API_URL}?path=import_clients`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ clients: importedClients })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Error importing clients:', error);
+    }
+  };
+
+  const handleSaveScenario = async (scenario: any) => {
+    try {
+      const response = await fetch(`${API_URL}?path=save_scenario`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ scenario })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Error saving scenario:', error);
+    }
+  };
+
+  const handleDeleteScenario = async (scenarioId: number) => {
+    try {
+      const response = await fetch(`${API_URL}?path=delete_scenario`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ scenario_id: scenarioId })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Error deleting scenario:', error);
     }
   };
 
@@ -152,6 +214,10 @@ const Index = () => {
               <Icon name="Mail" size={16} />
               Email рассылки
             </TabsTrigger>
+            <TabsTrigger value="scenarios" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary">
+              <Icon name="GitBranch" size={16} />
+              Сценарии AI
+            </TabsTrigger>
             <TabsTrigger value="settings" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary">
               <Icon name="Settings" size={16} />
               Настройки
@@ -173,6 +239,7 @@ const Index = () => {
               getStatusColor={getStatusColor}
               handleInitiateCall={handleInitiateCall}
               callingInProgress={callingInProgress}
+              onImportClients={handleImportClients}
             />
           </TabsContent>
 
@@ -187,6 +254,14 @@ const Index = () => {
             <EmailsTab 
               emailCampaigns={emailCampaigns} 
               getStatusColor={getStatusColor}
+            />
+          </TabsContent>
+
+          <TabsContent value="scenarios">
+            <ScenarioBuilder 
+              scenarios={scenarios}
+              onSaveScenario={handleSaveScenario}
+              onDeleteScenario={handleDeleteScenario}
             />
           </TabsContent>
 

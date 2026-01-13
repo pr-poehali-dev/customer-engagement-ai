@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -5,15 +6,51 @@ import Icon from '@/components/ui/icon';
 import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import * as XLSX from 'xlsx';
 
 interface ClientsTabProps {
   clients: any[];
   getStatusColor: (status: string) => string;
   handleInitiateCall: (clientId: number, phone: string) => Promise<void>;
   callingInProgress: {[key: number]: boolean};
+  onImportClients: (clients: any[]) => void;
 }
 
-export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callingInProgress }: ClientsTabProps) => {
+export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callingInProgress, onImportClients }: ClientsTabProps) => {
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      const parsedClients = jsonData.map((row: any, index: number) => ({
+        id: Date.now() + index,
+        name: row['Имя'] || row['Name'] || row['ФИО'] || '',
+        email: row['Email'] || row['Почта'] || row['E-mail'] || '',
+        phone: row['Телефон'] || row['Phone'] || row['Номер'] || '',
+        status: 'cold',
+        last_contact: 'Импортирован'
+      }));
+
+      onImportClients(parsedClients);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Error importing Excel:', error);
+    } finally {
+      setImporting(false);
+    }
+  };
   return (
     <div className="animate-fade-in">
       <Card className="p-6 bg-card/50 backdrop-blur-sm border-border/50">
@@ -22,10 +59,28 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
             <h3 className="text-xl font-bold">База клиентов</h3>
             <p className="text-sm text-muted-foreground">Управление контактами и историей взаимодействий</p>
           </div>
-          <Button className="bg-gradient-to-r from-primary to-secondary hover:opacity-90">
-            <Icon name="Plus" size={16} className="mr-2" />
-            Добавить клиента
-          </Button>
+          <div className="flex gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <Button 
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="border-primary/50 hover:bg-primary/10"
+            >
+              <Icon name={importing ? "Loader2" : "Upload"} size={16} className={`mr-2 ${importing ? 'animate-spin' : ''}`} />
+              Импорт из Excel
+            </Button>
+            <Button className="bg-gradient-to-r from-primary to-secondary hover:opacity-90">
+              <Icon name="Plus" size={16} className="mr-2" />
+              Добавить клиента
+            </Button>
+          </div>
         </div>
 
         <div className="flex gap-4 mb-6">
