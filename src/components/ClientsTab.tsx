@@ -20,6 +20,26 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const downloadTemplate = () => {
+    const templateData = [
+      { 'Имя': 'Иван Петров', 'Email': 'ivan@example.com', 'Телефон': '+7 999 123-45-67' },
+      { 'Имя': 'Мария Сидорова', 'Email': 'maria@example.com', 'Телефон': '+7 999 765-43-21' },
+      { 'Имя': 'Алексей Смирнов', 'Email': 'alexey@example.com', 'Телефон': '+7 999 111-22-33' }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Клиенты');
+    
+    worksheet['!cols'] = [
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 20 }
+    ];
+    
+    XLSX.writeFile(workbook, 'Шаблон_импорта_клиентов.xlsx');
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -67,6 +87,14 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
               onChange={handleFileUpload}
               className="hidden"
             />
+            <Button 
+              variant="outline"
+              onClick={downloadTemplate}
+              className="border-secondary/50 hover:bg-secondary/10"
+            >
+              <Icon name="Download" size={16} className="mr-2" />
+              Скачать шаблон
+            </Button>
             <Button 
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
