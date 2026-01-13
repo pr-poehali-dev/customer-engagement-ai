@@ -1,0 +1,24 @@
+{
+  "tests": [
+    {
+      "name": "Get statistics",
+      "method": "GET",
+      "path": "/?path=stats",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Get clients list",
+      "method": "GET",
+      "path": "/?path=clients",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get calls history",
+      "method": "GET",
+      "path": "/?path=calls",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}

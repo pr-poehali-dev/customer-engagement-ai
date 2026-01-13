@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -12,34 +12,56 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
+const API_URL = 'https://functions.poehali.dev/0c17e1a7-ce1b-49a9-9ef7-f7cb2df73405';
+
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalClients: 0,
+    callsToday: 0,
+    emailsSent: 0,
+    conversion: 0
+  });
+  const [recentCalls, setRecentCalls] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [emailCampaigns, setEmailCampaigns] = useState<any[]>([]);
 
-  const stats = [
-    { label: 'Всего клиентов', value: '2,847', change: '+12%', icon: 'Users', color: 'text-primary' },
-    { label: 'Звонков сегодня', value: '142', change: '+8%', icon: 'Phone', color: 'text-secondary' },
-    { label: 'Email отправлено', value: '1,923', change: '+24%', icon: 'Mail', color: 'text-accent' },
-    { label: 'Конверсия', value: '68%', change: '+5%', icon: 'TrendingUp', color: 'text-primary' },
-  ];
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const recentCalls = [
-    { id: 1, client: 'Иван Петров', status: 'success', duration: '5:42', timestamp: '10:30', result: 'Запись на встречу' },
-    { id: 2, client: 'Мария Сидорова', status: 'pending', duration: '3:15', timestamp: '10:15', result: 'В процессе' },
-    { id: 3, client: 'Алексей Козлов', status: 'failed', duration: '1:05', timestamp: '09:45', result: 'Не дозвонились' },
-    { id: 4, client: 'Елена Волкова', status: 'success', duration: '7:20', timestamp: '09:20', result: 'Продажа' },
-  ];
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [statsRes, callsRes, clientsRes, campaignsRes] = await Promise.all([
+        fetch(`${API_URL}?path=stats`),
+        fetch(`${API_URL}?path=calls`),
+        fetch(`${API_URL}?path=clients`),
+        fetch(`${API_URL}?path=campaigns`)
+      ]);
 
-  const clients = [
-    { id: 1, name: 'Иван Петров', email: 'ivan@mail.ru', phone: '+7 999 123-45-67', status: 'hot', lastContact: '2 часа назад' },
-    { id: 2, name: 'Мария Сидорова', email: 'maria@mail.ru', phone: '+7 999 234-56-78', status: 'warm', lastContact: '1 день назад' },
-    { id: 3, name: 'Алексей Козлов', email: 'alex@mail.ru', phone: '+7 999 345-67-89', status: 'cold', lastContact: '5 дней назад' },
-    { id: 4, name: 'Елена Волкова', email: 'elena@mail.ru', phone: '+7 999 456-78-90', status: 'hot', lastContact: '30 минут назад' },
-  ];
+      const statsData = await statsRes.json();
+      const callsData = await callsRes.json();
+      const clientsData = await clientsRes.json();
+      const campaignsData = await campaignsRes.json();
 
-  const emailCampaigns = [
-    { id: 1, name: 'Новогодняя акция', sent: 1250, opened: 850, clicked: 320, status: 'active' },
-    { id: 2, name: 'Приглашение на вебинар', sent: 450, opened: 280, clicked: 95, status: 'completed' },
-    { id: 3, name: 'Персональные предложения', sent: 650, opened: 420, clicked: 180, status: 'active' },
+      setStats(statsData);
+      setRecentCalls(callsData);
+      setClients(clientsData);
+      setEmailCampaigns(campaignsData);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statsDisplay = [
+    { label: 'Всего клиентов', value: stats.totalClients.toString(), change: '+12%', icon: 'Users', color: 'text-primary' },
+    { label: 'Звонков сегодня', value: stats.callsToday.toString(), change: '+8%', icon: 'Phone', color: 'text-secondary' },
+    { label: 'Email отправлено', value: stats.emailsSent.toLocaleString(), change: '+24%', icon: 'Mail', color: 'text-accent' },
+    { label: 'Конверсия', value: `${stats.conversion}%`, change: '+5%', icon: 'TrendingUp', color: 'text-primary' },
   ];
 
   const getStatusColor = (status: string) => {
@@ -112,7 +134,7 @@ const Index = () => {
 
           <TabsContent value="dashboard" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {stats.map((stat, index) => (
+              {statsDisplay.map((stat, index) => (
                 <Card key={index} className="p-6 bg-card/50 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-all duration-300 hover:scale-105 animate-scale-in" style={{ animationDelay: `${index * 100}ms` }}>
                   <div className="flex items-start justify-between">
                     <div>
@@ -135,18 +157,18 @@ const Index = () => {
               <Card className="p-6 bg-card/50 backdrop-blur-sm border-border/50">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold">Последние звонки ИИ</h3>
-                  <Button size="sm" className="bg-gradient-to-r from-primary to-secondary hover:opacity-90">
-                    <Icon name="Plus" size={16} className="mr-2" />
-                    Новый звонок
+                  <Button size="sm" className="bg-gradient-to-r from-primary to-secondary hover:opacity-90" onClick={loadData}>
+                    <Icon name="RefreshCw" size={16} className="mr-2" />
+                    Обновить
                   </Button>
                 </div>
                 <div className="space-y-4">
                   {recentCalls.map((call) => (
                     <div key={call.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 flex-1">
                         <Avatar className="w-10 h-10 border-2 border-primary/30">
                           <div className="w-full h-full bg-gradient-to-br from-primary/50 to-secondary/50 flex items-center justify-center text-sm font-semibold">
-                            {call.client.split(' ').map(n => n[0]).join('')}
+                            {call.client?.split(' ').map((n: string) => n[0]).join('') || '??'}
                           </div>
                         </Avatar>
                         <div>
@@ -252,7 +274,7 @@ const Index = () => {
                     <div className="flex items-center gap-4">
                       <Avatar className="w-12 h-12 border-2 border-primary/30">
                         <div className="w-full h-full bg-gradient-to-br from-primary/50 to-secondary/50 flex items-center justify-center font-semibold">
-                          {client.name.split(' ').map(n => n[0]).join('')}
+                          {client.name?.split(' ').map((n: string) => n[0]).join('') || '??'}
                         </div>
                       </Avatar>
                       <div>
@@ -274,7 +296,7 @@ const Index = () => {
                         <Badge className={`${getStatusColor(client.status)} border mb-1`}>
                           {client.status === 'hot' ? 'Горячий' : client.status === 'warm' ? 'Теплый' : 'Холодный'}
                         </Badge>
-                        <p className="text-xs text-muted-foreground">{client.lastContact}</p>
+                        <p className="text-xs text-muted-foreground">{client.last_contact}</p>
                       </div>
                       <div className="flex gap-2">
                         <Button variant="ghost" size="icon">
@@ -315,7 +337,7 @@ const Index = () => {
                         <div className="flex items-center gap-3">
                           <Avatar className="w-10 h-10 border-2 border-primary/30">
                             <div className="w-full h-full bg-gradient-to-br from-primary/50 to-secondary/50 flex items-center justify-center text-sm font-semibold">
-                              {call.client.split(' ').map(n => n[0]).join('')}
+                              {call.client?.split(' ').map((n: string) => n[0]).join('') || '??'}
                             </div>
                           </Avatar>
                           <div>
