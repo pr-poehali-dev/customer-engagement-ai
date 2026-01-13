@@ -5,12 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { Avatar } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { DashboardTab } from '@/components/DashboardTab';
+import { ClientsTab } from '@/components/ClientsTab';
+import { CallsTab } from '@/components/CallsTab';
+import { EmailsTab } from '@/components/EmailsTab';
 
 const API_URL = 'https://functions.poehali.dev/0c17e1a7-ce1b-49a9-9ef7-f7cb2df73405';
 
@@ -57,13 +60,6 @@ const Index = () => {
       setLoading(false);
     }
   };
-
-  const statsDisplay = [
-    { label: 'Всего клиентов', value: stats.totalClients.toString(), change: '+12%', icon: 'Users', color: 'text-primary' },
-    { label: 'Звонков сегодня', value: stats.callsToday.toString(), change: '+8%', icon: 'Phone', color: 'text-secondary' },
-    { label: 'Email отправлено', value: stats.emailsSent.toLocaleString(), change: '+24%', icon: 'Mail', color: 'text-accent' },
-    { label: 'Конверсия', value: `${stats.conversion}%`, change: '+5%', icon: 'TrendingUp', color: 'text-primary' },
-  ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -162,387 +158,36 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="dashboard" className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {statsDisplay.map((stat, index) => (
-                <Card key={index} className="p-6 bg-card/50 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-all duration-300 hover:scale-105 animate-scale-in" style={{ animationDelay: `${index * 100}ms` }}>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">{stat.label}</p>
-                      <h3 className="text-3xl font-bold mb-1">{stat.value}</h3>
-                      <p className="text-xs text-green-400 flex items-center gap-1">
-                        <Icon name="ArrowUp" size={12} />
-                        {stat.change}
-                      </p>
-                    </div>
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center ${stat.color}`}>
-                      <Icon name={stat.icon as any} size={24} />
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="p-6 bg-card/50 backdrop-blur-sm border-border/50">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold">Последние звонки ИИ</h3>
-                  <Button size="sm" className="bg-gradient-to-r from-primary to-secondary hover:opacity-90" onClick={loadData}>
-                    <Icon name="RefreshCw" size={16} className="mr-2" />
-                    Обновить
-                  </Button>
-                </div>
-                <div className="space-y-4">
-                  {recentCalls.map((call) => (
-                    <div key={call.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-4 flex-1">
-                        <Avatar className="w-10 h-10 border-2 border-primary/30">
-                          <div className="w-full h-full bg-gradient-to-br from-primary/50 to-secondary/50 flex items-center justify-center text-sm font-semibold">
-                            {call.client?.split(' ').map((n: string) => n[0]).join('') || '??'}
-                          </div>
-                        </Avatar>
-                        <div>
-                          <p className="font-semibold">{call.client}</p>
-                          <p className="text-xs text-muted-foreground">{call.timestamp} • {call.duration}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge className={`${getStatusColor(call.status)} border`}>
-                          {call.result}
-                        </Badge>
-                        <Button variant="ghost" size="icon">
-                          <Icon name="Play" size={16} />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="p-6 bg-card/50 backdrop-blur-sm border-border/50">
-                <h3 className="text-xl font-bold mb-6">Активность ИИ агента</h3>
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Успешные звонки</span>
-                      <span className="text-sm font-semibold">89/120</span>
-                    </div>
-                    <Progress value={74} className="h-2 bg-muted" />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Конверсия в продажу</span>
-                      <span className="text-sm font-semibold">68%</span>
-                    </div>
-                    <Progress value={68} className="h-2 bg-muted" />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Средняя длительность</span>
-                      <span className="text-sm font-semibold">5:32 мин</span>
-                    </div>
-                    <Progress value={92} className="h-2 bg-muted" />
-                  </div>
-                  
-                  <div className="pt-4 border-t border-border/50">
-                    <h4 className="font-semibold mb-4">Быстрые действия</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button variant="outline" className="justify-start gap-2">
-                        <Icon name="FileText" size={16} />
-                        Отчеты
-                      </Button>
-                      <Button variant="outline" className="justify-start gap-2">
-                        <Icon name="Settings" size={16} />
-                        Настройки ИИ
-                      </Button>
-                      <Button variant="outline" className="justify-start gap-2">
-                        <Icon name="Download" size={16} />
-                        Экспорт
-                      </Button>
-                      <Button variant="outline" className="justify-start gap-2">
-                        <Icon name="BarChart" size={16} />
-                        Аналитика
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
+          <TabsContent value="dashboard">
+            <DashboardTab 
+              stats={stats} 
+              recentCalls={recentCalls} 
+              getStatusColor={getStatusColor}
+              loadData={loadData}
+            />
           </TabsContent>
 
-          <TabsContent value="clients" className="animate-fade-in">
-            <Card className="p-6 bg-card/50 backdrop-blur-sm border-border/50">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-xl font-bold">База клиентов</h3>
-                  <p className="text-sm text-muted-foreground">Управление контактами и историей взаимодействий</p>
-                </div>
-                <Button className="bg-gradient-to-r from-primary to-secondary hover:opacity-90">
-                  <Icon name="Plus" size={16} className="mr-2" />
-                  Добавить клиента
-                </Button>
-              </div>
-
-              <div className="flex gap-4 mb-6">
-                <Input placeholder="Поиск по имени, email, телефону..." className="flex-1 bg-muted/30" />
-                <Select defaultValue="all">
-                  <SelectTrigger className="w-[180px] bg-muted/30">
-                    <SelectValue placeholder="Статус" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Все статусы</SelectItem>
-                    <SelectItem value="hot">Горячие</SelectItem>
-                    <SelectItem value="warm">Теплые</SelectItem>
-                    <SelectItem value="cold">Холодные</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-3">
-                {clients.map((client) => (
-                  <div key={client.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all hover:scale-[1.01]">
-                    <div className="flex items-center gap-4">
-                      <Avatar className="w-12 h-12 border-2 border-primary/30">
-                        <div className="w-full h-full bg-gradient-to-br from-primary/50 to-secondary/50 flex items-center justify-center font-semibold">
-                          {client.name?.split(' ').map((n: string) => n[0]).join('') || '??'}
-                        </div>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold">{client.name}</p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Icon name="Mail" size={12} />
-                            {client.email}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Icon name="Phone" size={12} />
-                            {client.phone}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <Badge className={`${getStatusColor(client.status)} border mb-1`}>
-                          {client.status === 'hot' ? 'Горячий' : client.status === 'warm' ? 'Теплый' : 'Холодный'}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground">{client.last_contact}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleInitiateCall(client.id, client.phone)}
-                          disabled={callingInProgress[client.id]}
-                          className="hover:bg-green-500/20 hover:text-green-600"
-                        >
-                          <Icon name={callingInProgress[client.id] ? "Loader2" : "Phone"} size={16} className={callingInProgress[client.id] ? 'animate-spin' : ''} />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="hover:bg-blue-500/20 hover:text-blue-600">
-                          <Icon name="Mail" size={16} />
-                        </Button>
-                        <Button variant="ghost" size="icon">
-                          <Icon name="MoreVertical" size={16} />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
+          <TabsContent value="clients">
+            <ClientsTab 
+              clients={clients} 
+              getStatusColor={getStatusColor}
+              handleInitiateCall={handleInitiateCall}
+              callingInProgress={callingInProgress}
+            />
           </TabsContent>
 
-          <TabsContent value="calls" className="animate-fade-in">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-2 p-6 bg-card/50 backdrop-blur-sm border-border/50">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold">ИИ Звонки</h3>
-                    <p className="text-sm text-muted-foreground">Инициирование и мониторинг автоматических звонков</p>
-                  </div>
-                  <Button className="bg-gradient-to-r from-primary to-secondary hover:opacity-90">
-                    <Icon name="Phone" size={16} className="mr-2" />
-                    Начать обзвон
-                  </Button>
-                </div>
-
-                <div className="space-y-3">
-                  {recentCalls.map((call) => (
-                    <div key={call.id} className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="w-10 h-10 border-2 border-primary/30">
-                            <div className="w-full h-full bg-gradient-to-br from-primary/50 to-secondary/50 flex items-center justify-center text-sm font-semibold">
-                              {call.client?.split(' ').map((n: string) => n[0]).join('') || '??'}
-                            </div>
-                          </Avatar>
-                          <div>
-                            <p className="font-semibold">{call.client}</p>
-                            <p className="text-xs text-muted-foreground">{call.timestamp}</p>
-                          </div>
-                        </div>
-                        <Badge className={`${getStatusColor(call.status)} border`}>
-                          {call.result}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <Icon name="Clock" size={14} />
-                          {call.duration}
-                        </span>
-                        <div className="flex gap-2 ml-auto">
-                          <Button variant="ghost" size="sm" className="h-8">
-                            <Icon name="Play" size={14} className="mr-1" />
-                            Прослушать
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-8">
-                            <Icon name="FileText" size={14} className="mr-1" />
-                            Транскрипт
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="p-6 bg-card/50 backdrop-blur-sm border-border/50">
-                <h3 className="text-lg font-bold mb-4">Настройки ИИ агента</h3>
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm mb-2 block">Тон голоса</Label>
-                    <Select defaultValue="professional">
-                      <SelectTrigger className="bg-muted/30">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="professional">Профессиональный</SelectItem>
-                        <SelectItem value="friendly">Дружелюбный</SelectItem>
-                        <SelectItem value="formal">Официальный</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label className="text-sm mb-2 block">Скорость речи</Label>
-                    <Select defaultValue="medium">
-                      <SelectTrigger className="bg-muted/30">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="slow">Медленная</SelectItem>
-                        <SelectItem value="medium">Средняя</SelectItem>
-                        <SelectItem value="fast">Быстрая</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label>Запись звонков</Label>
-                    <Switch defaultChecked />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label>Автоматические повторы</Label>
-                    <Switch defaultChecked />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label>Уведомления</Label>
-                    <Switch defaultChecked />
-                  </div>
-
-                  <Button className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 mt-4">
-                    Сохранить настройки
-                  </Button>
-                </div>
-              </Card>
-            </div>
+          <TabsContent value="calls">
+            <CallsTab 
+              recentCalls={recentCalls} 
+              getStatusColor={getStatusColor}
+            />
           </TabsContent>
 
-          <TabsContent value="emails" className="animate-fade-in">
-            <Card className="p-6 bg-card/50 backdrop-blur-sm border-border/50">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-xl font-bold">Email рассылки</h3>
-                  <p className="text-sm text-muted-foreground">Создание и управление email кампаниями</p>
-                </div>
-                <Button className="bg-gradient-to-r from-primary to-secondary hover:opacity-90">
-                  <Icon name="Plus" size={16} className="mr-2" />
-                  Новая рассылка
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                {emailCampaigns.map((campaign) => (
-                  <div key={campaign.id} className="p-5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h4 className="font-semibold mb-1">{campaign.name}</h4>
-                        <Badge className={`${getStatusColor(campaign.status)} border text-xs`}>
-                          {campaign.status === 'active' ? 'Активна' : 'Завершена'}
-                        </Badge>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="icon">
-                          <Icon name="Edit" size={16} />
-                        </Button>
-                        <Button variant="ghost" size="icon">
-                          <Icon name="Copy" size={16} />
-                        </Button>
-                        <Button variant="ghost" size="icon">
-                          <Icon name="MoreVertical" size={16} />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center p-3 rounded-lg bg-card/50">
-                        <p className="text-2xl font-bold mb-1">{campaign.sent}</p>
-                        <p className="text-xs text-muted-foreground">Отправлено</p>
-                      </div>
-                      <div className="text-center p-3 rounded-lg bg-card/50">
-                        <p className="text-2xl font-bold mb-1">{campaign.opened}</p>
-                        <p className="text-xs text-muted-foreground">Открыто</p>
-                        <p className="text-xs text-green-400 mt-1">{Math.round((campaign.opened / campaign.sent) * 100)}%</p>
-                      </div>
-                      <div className="text-center p-3 rounded-lg bg-card/50">
-                        <p className="text-2xl font-bold mb-1">{campaign.clicked}</p>
-                        <p className="text-xs text-muted-foreground">Кликнуло</p>
-                        <p className="text-xs text-green-400 mt-1">{Math.round((campaign.clicked / campaign.opened) * 100)}%</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 p-6 rounded-lg bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/20">
-                <h4 className="font-semibold mb-4 flex items-center gap-2">
-                  <Icon name="Sparkles" size={18} className="text-primary" />
-                  Создать новую рассылку с помощью ИИ
-                </h4>
-                <div className="space-y-3">
-                  <Input placeholder="Название кампании" className="bg-card/50" />
-                  <Textarea placeholder="Опишите цель рассылки, и ИИ создаст персонализированный контент..." className="bg-card/50 min-h-[100px]" />
-                  <div className="flex gap-3">
-                    <Select defaultValue="all">
-                      <SelectTrigger className="bg-card/50">
-                        <SelectValue placeholder="Целевая аудитория" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Все клиенты</SelectItem>
-                        <SelectItem value="hot">Горячие лиды</SelectItem>
-                        <SelectItem value="inactive">Неактивные</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button className="bg-gradient-to-r from-primary to-secondary hover:opacity-90">
-                      <Icon name="Wand2" size={16} className="mr-2" />
-                      Сгенерировать с ИИ
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
+          <TabsContent value="emails">
+            <EmailsTab 
+              emailCampaigns={emailCampaigns} 
+              getStatusColor={getStatusColor}
+            />
           </TabsContent>
 
           <TabsContent value="settings" className="animate-fade-in">
