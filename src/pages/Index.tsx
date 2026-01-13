@@ -26,6 +26,7 @@ const Index = () => {
   const [recentCalls, setRecentCalls] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [emailCampaigns, setEmailCampaigns] = useState<any[]>([]);
+  const [callingInProgress, setCallingInProgress] = useState<{[key: number]: boolean}>({});
 
   useEffect(() => {
     loadData();
@@ -75,6 +76,35 @@ const Index = () => {
       case 'active': return 'bg-green-500/20 text-green-400 border-green-500/50';
       case 'completed': return 'bg-gray-500/20 text-gray-400 border-gray-500/50';
       default: return 'bg-gray-500/20 text-gray-400';
+    }
+  };
+
+  const handleInitiateCall = async (clientId: number, phone: string) => {
+    setCallingInProgress(prev => ({ ...prev, [clientId]: true }));
+    
+    try {
+      const response = await fetch(`${API_URL}?path=initiate_call`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          phone: phone
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        await loadData();
+      } else {
+        console.error('Failed to initiate call:', result.error);
+      }
+    } catch (error) {
+      console.error('Error initiating call:', error);
+    } finally {
+      setCallingInProgress(prev => ({ ...prev, [clientId]: false }));
     }
   };
 
@@ -299,10 +329,16 @@ const Index = () => {
                         <p className="text-xs text-muted-foreground">{client.last_contact}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="ghost" size="icon">
-                          <Icon name="Phone" size={16} />
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleInitiateCall(client.id, client.phone)}
+                          disabled={callingInProgress[client.id]}
+                          className="hover:bg-green-500/20 hover:text-green-600"
+                        >
+                          <Icon name={callingInProgress[client.id] ? "Loader2" : "Phone"} size={16} className={callingInProgress[client.id] ? 'animate-spin' : ''} />
                         </Button>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="hover:bg-blue-500/20 hover:text-blue-600">
                           <Icon name="Mail" size={16} />
                         </Button>
                         <Button variant="ghost" size="icon">

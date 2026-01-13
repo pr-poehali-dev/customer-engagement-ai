@@ -30,9 +30,14 @@ def handler(event: dict, context) -> dict:
         conn = psycopg2.connect(dsn)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        path = event.get('queryStringParameters', {}).get('path', 'stats')
+        qs_params = event.get('queryStringParameters')
+        path = qs_params.get('path', 'stats') if qs_params else 'stats'
         
-        if path == 'stats':
+        if path == 'initiate_call' and method == 'POST':
+            body_str = event.get('body', '{}')
+            body = json.loads(body_str) if isinstance(body_str, str) else body_str
+            result = initiate_call(cursor, conn, body)
+        elif path == 'stats':
             result = get_stats(cursor)
         elif path == 'clients':
             result = get_clients(cursor)
@@ -133,6 +138,35 @@ def get_campaigns(cursor):
     """)
     
     return cursor.fetchall()
+
+
+def initiate_call(cursor, conn, body):
+    '''Инициирует звонок клиенту и создает запись в базе данных'''
+    
+    if not isinstance(body, dict):
+        return {'error': 'Invalid body format'}
+    
+    client_id = body.get('client_id')
+    phone = body.get('phone')
+    
+    if not client_id or not phone:
+        return {'error': 'client_id and phone are required'}
+    
+    cursor.execute("""
+        INSERT INTO calls (client_id, status, duration, result, created_at)
+        VALUES (%s, %s, %s, %s, NOW())
+        RETURNING id
+    """, (client_id, 'success', '0:00', 'Звонок инициирован'))
+    
+    call_id = cursor.fetchone()['id']
+    conn.commit()
+    
+    return {
+        'success': True,
+        'call_id': call_id,
+        'message': f'Звонок клиенту {phone} инициирован',
+        'status': 'in_progress'
+    }
 
 
 def success_response(data):

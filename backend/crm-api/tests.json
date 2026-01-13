@@ -19,6 +19,20 @@
       "path": "/?path=calls",
       "expectedStatus": 200,
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Initiate call",
+      "method": "POST",
+      "path": "/?path=initiate_call",
+      "body": {
+        "client_id": 1,
+        "phone": "+79991234567"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
     }
   ]
 }
