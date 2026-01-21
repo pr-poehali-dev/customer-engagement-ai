@@ -1,0 +1,24 @@
+{
+  "tests": [
+    {
+      "name": "Create payment with QR code",
+      "method": "POST",
+      "path": "/",
+      "headers": {
+        "X-Authorization": "Bearer test_token"
+      },
+      "body": {
+        "action": "create_payment",
+        "amount": 1000,
+        "description": "Тестовый платеж"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "payment_id": "string",
+        "qr_code": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
