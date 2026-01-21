@@ -25,7 +25,7 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
 
   const downloadTemplate = () => {
     const templateData = [
-      { 'Имя': '', 'Email': '', 'Телефон': '' }
+      { 'Имя': '', 'Email': '', 'Телефон': '', 'Юр. лицо': '', 'Юр. адрес': '' }
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
@@ -35,7 +35,9 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
     worksheet['!cols'] = [
       { wch: 20 },
       { wch: 30 },
-      { wch: 20 }
+      { wch: 20 },
+      { wch: 35 },
+      { wch: 40 }
     ];
     
     XLSX.writeFile(workbook, 'Шаблон_импорта_клиентов.xlsx');
@@ -58,6 +60,8 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
         name: row['Имя'] || row['Name'] || row['ФИО'] || '',
         email: row['Email'] || row['Почта'] || row['E-mail'] || '',
         phone: row['Телефон'] || row['Phone'] || row['Номер'] || '',
+        company: row['Юр. лицо'] || row['Компания'] || row['Company'] || '',
+        legalAddress: row['Юр. адрес'] || row['Адрес'] || row['Address'] || '',
         status: 'cold',
         last_contact: 'Импортирован'
       }));
@@ -154,6 +158,9 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
                 </Avatar>
                 <div>
                   <p className="font-semibold">{client.name}</p>
+                  {client.company && (
+                    <p className="text-sm text-muted-foreground">{client.company}</p>
+                  )}
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Icon name="Mail" size={12} />
@@ -164,6 +171,12 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
                       {client.phone}
                     </span>
                   </div>
+                  {client.legalAddress && (
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <Icon name="MapPin" size={12} />
+                      {client.legalAddress}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-4">
