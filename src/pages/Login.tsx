@@ -39,7 +39,7 @@ const Login = () => {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">
             AVT
           </h1>
-          <p className="text-muted-foreground">AI Customer Engagement Platform</p>
+          <p className="text-muted-foreground">Платформа автоматизации работы с клиентами</p>
         </div>
 
         <Card className="p-8 backdrop-blur-sm bg-card/50 border-border/50 shadow-xl">
@@ -87,6 +87,16 @@ const Login = () => {
                 </>
               )}
             </Button>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => navigate('/password-recovery')}
+                className="text-sm text-primary hover:underline"
+              >
+                Забыли пароль?
+              </button>
+            </div>
           </form>
 
           <div className="mt-6 pt-6 border-t border-border/50">

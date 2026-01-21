@@ -143,9 +143,9 @@ const Dashboard = () => {
             </div>
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                AVT Dashboard
+                Панель управления AVT
               </h1>
-              <p className="text-sm text-muted-foreground">AI Customer Engagement Platform</p>
+              <p className="text-sm text-muted-foreground">Платформа автоматизации работы с клиентами</p>
             </div>
           </div>
           <Button variant="outline" onClick={handleLogout} className="border-red-500/50 hover:bg-red-500/10">
