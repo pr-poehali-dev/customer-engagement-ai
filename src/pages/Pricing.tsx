@@ -69,7 +69,7 @@ const Pricing = () => {
     },
     {
       category: 'Приоритет обработки',
-      starter: 'Стандартный',
+      starter: 'Обычный',
       pro: 'Высокий',
       enterprise: 'Максимальный'
     },
