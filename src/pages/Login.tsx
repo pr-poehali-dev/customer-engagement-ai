@@ -156,7 +156,7 @@ const Login = () => {
                   </div>
                 </div>
 
-                <Button className="w-full" variant="outline">
+                <Button className="w-full" variant="outline" onClick={() => navigate('/pricing')}>
                   <Icon name="Sparkles" size={16} className="mr-2" />
                   Подробнее
                 </Button>
@@ -252,7 +252,7 @@ const Login = () => {
                   </div>
                 </div>
 
-                <Button className="w-full" variant="outline">
+                <Button className="w-full" variant="outline" onClick={() => navigate('/pricing')}>
                   <Icon name="Phone" size={16} className="mr-2" />
                   Связаться с нами
                 </Button>
