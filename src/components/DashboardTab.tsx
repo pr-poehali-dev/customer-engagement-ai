@@ -19,10 +19,10 @@ interface DashboardTabProps {
 
 export const DashboardTab = ({ stats, recentCalls, getStatusColor, loadData }: DashboardTabProps) => {
   const statsDisplay = [
-    { label: 'Всего клиентов', value: stats.totalClients.toString(), change: '+12%', icon: 'Users', color: 'text-primary' },
-    { label: 'Звонков сегодня', value: stats.callsToday.toString(), change: '+8%', icon: 'Phone', color: 'text-secondary' },
-    { label: 'Email отправлено', value: stats.emailsSent.toLocaleString(), change: '+24%', icon: 'Mail', color: 'text-accent' },
-    { label: 'Конверсия', value: `${stats.conversion}%`, change: '+5%', icon: 'TrendingUp', color: 'text-primary' },
+    { label: 'Всего клиентов', value: stats.totalClients.toString(), change: '', icon: 'Users', color: 'text-primary' },
+    { label: 'Звонков сегодня', value: stats.callsToday.toString(), change: '', icon: 'Phone', color: 'text-secondary' },
+    { label: 'Email отправлено', value: stats.emailsSent.toLocaleString(), change: '', icon: 'Mail', color: 'text-accent' },
+    { label: 'Конверсия', value: `${stats.conversion}%`, change: '', icon: 'TrendingUp', color: 'text-primary' },
   ];
 
   return (
@@ -34,10 +34,12 @@ export const DashboardTab = ({ stats, recentCalls, getStatusColor, loadData }: D
               <div>
                 <p className="text-sm text-muted-foreground mb-2">{stat.label}</p>
                 <h3 className="text-3xl font-bold mb-1">{stat.value}</h3>
-                <p className="text-xs text-green-400 flex items-center gap-1">
-                  <Icon name="ArrowUp" size={12} />
-                  {stat.change}
-                </p>
+                {stat.change && (
+                  <p className="text-xs text-green-400 flex items-center gap-1">
+                    <Icon name="ArrowUp" size={12} />
+                    {stat.change}
+                  </p>
+                )}
               </div>
               <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center ${stat.color}`}>
                 <Icon name={stat.icon as any} size={24} />
@@ -89,23 +91,23 @@ export const DashboardTab = ({ stats, recentCalls, getStatusColor, loadData }: D
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-muted-foreground">Успешные звонки</span>
-                <span className="text-sm font-semibold">89/120</span>
+                <span className="text-sm font-semibold">0/0</span>
               </div>
-              <Progress value={74} className="h-2 bg-muted" />
+              <Progress value={0} className="h-2 bg-muted" />
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-muted-foreground">Конверсия в продажу</span>
-                <span className="text-sm font-semibold">68%</span>
+                <span className="text-sm font-semibold">0%</span>
               </div>
-              <Progress value={68} className="h-2 bg-muted" />
+              <Progress value={0} className="h-2 bg-muted" />
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-muted-foreground">Средняя длительность</span>
-                <span className="text-sm font-semibold">5:32 мин</span>
+                <span className="text-sm font-semibold">0:00 мин</span>
               </div>
-              <Progress value={92} className="h-2 bg-muted" />
+              <Progress value={0} className="h-2 bg-muted" />
             </div>
             
             <div className="pt-4 border-t border-border/50">

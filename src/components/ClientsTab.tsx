@@ -25,9 +25,7 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
 
   const downloadTemplate = () => {
     const templateData = [
-      { 'Имя': 'Иван Петров', 'Email': 'ivan@example.com', 'Телефон': '+7 999 123-45-67' },
-      { 'Имя': 'Мария Сидорова', 'Email': 'maria@example.com', 'Телефон': '+7 999 765-43-21' },
-      { 'Имя': 'Алексей Смирнов', 'Email': 'alexey@example.com', 'Телефон': '+7 999 111-22-33' }
+      { 'Имя': '', 'Email': '', 'Телефон': '' }
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
