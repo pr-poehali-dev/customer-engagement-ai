@@ -19,7 +19,7 @@ interface DashboardTabProps {
 
 export const DashboardTab = ({ stats, recentCalls, getStatusColor, loadData }: DashboardTabProps) => {
   const statsDisplay = [
-    { label: 'Всего клиентов', value: stats.totalClients.toString(), change: '', icon: 'Users', color: 'text-primary' },
+    { label: 'Всего клиентов', value: '', change: '', icon: 'Users', color: 'text-primary' },
     { label: 'Звонков сегодня', value: stats.callsToday.toString(), change: '', icon: 'Phone', color: 'text-secondary' },
     { label: 'Email отправлено', value: stats.emailsSent.toLocaleString(), change: '', icon: 'Mail', color: 'text-accent' },
     { label: 'Конверсия', value: `${stats.conversion}%`, change: '', icon: 'TrendingUp', color: 'text-primary' },
