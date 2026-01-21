@@ -18,28 +18,7 @@ interface Task {
 }
 
 export const AssistantTab = () => {
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: 1,
-      type: 'meeting',
-      title: 'Встреча с клиентом ООО "Альфа"',
-      description: 'Обсуждение контракта на 2026 год',
-      date: '2026-01-25',
-      time: '14:00',
-      status: 'pending',
-      details: { location: 'Офис, переговорная №3' }
-    },
-    {
-      id: 2,
-      type: 'call',
-      title: 'Звонок директору Иванову',
-      description: 'Согласование бюджета',
-      date: '2026-01-22',
-      time: '10:30',
-      status: 'pending',
-      details: { phone: '+7 (999) 123-45-67' }
-    }
-  ]);
+  const [tasks, setTasks] = useState<Task[]>([]);
 
   const [showCalendarDialog, setShowCalendarDialog] = useState(false);
   const [calendarConnected, setCalendarConnected] = useState(false);
