@@ -12,20 +12,28 @@ export const SettingsTab = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess(false);
 
-    const savedPassword = localStorage.getItem('avt_password') || 'avt2025';
-
-    if (currentPassword !== savedPassword) {
-      setError('Неверный текущий пароль');
+    if (newPassword.length < 8) {
+      setError('Новый пароль должен содержать минимум 8 символов');
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError('Новый пароль должен содержать минимум 6 символов');
+    if (!/[A-Z]/.test(newPassword)) {
+      setError('Пароль должен содержать хотя бы одну заглавную букву');
+      return;
+    }
+
+    if (!/[a-z]/.test(newPassword)) {
+      setError('Пароль должен содержать хотя бы одну строчную букву');
+      return;
+    }
+
+    if (!/[0-9]/.test(newPassword)) {
+      setError('Пароль должен содержать хотя бы одну цифру');
       return;
     }
 
@@ -34,13 +42,44 @@ export const SettingsTab = () => {
       return;
     }
 
-    localStorage.setItem('avt_password', newPassword);
-    setSuccess(true);
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    try {
+      const token = localStorage.getItem('auth_token');
+      
+      if (!token) {
+        setError('Требуется авторизация');
+        return;
+      }
 
-    setTimeout(() => setSuccess(false), 3000);
+      const response = await fetch('https://functions.poehali.dev/daf62ef7-d43d-4aae-9055-6da5a504ab7a', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'change_password',
+          current_password: currentPassword,
+          new_password: newPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Ошибка при смене пароля');
+        return;
+      }
+
+      setSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError('Ошибка соединения с сервером');
+    }
   };
 
   return (
@@ -82,7 +121,7 @@ export const SettingsTab = () => {
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Минимум 6 символов"
+                  placeholder="Минимум 8 символов, A-z, 0-9"
                   className="bg-background/50"
                   required
                 />

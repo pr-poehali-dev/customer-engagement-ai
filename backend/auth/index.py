@@ -252,13 +252,87 @@ def handler(event: dict, context) -> dict:
                 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 'body': json.dumps({
                     'success': True,
-                    'user_id': user[0],
-                    'username': user[1],
-                    'email': user[2],
-                    'phone': user[3],
-                    'is_admin': is_admin,
                     'token': token,
-                    'token_expiry': token_expiry.isoformat()
+                    'user': {
+                        'id': user[0],
+                        'username': user[1],
+                        'email': user[2],
+                        'phone': user[3],
+                        'is_admin': is_admin
+                    }
+                }),
+                'isBase64Encoded': False
+            }
+        
+        elif action == 'change_password':
+            auth_header = event.get('headers', {}).get('X-Authorization', '')
+            token = auth_header.replace('Bearer ', '').strip()
+            
+            if not token:
+                return {
+                    'statusCode': 401,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Требуется авторизация'}),
+                    'isBase64Encoded': False
+                }
+            
+            cursor.execute(
+                f"SELECT id, username, salt FROM {schema}.users WHERE session_token = %s AND token_expiry > %s",
+                (token, datetime.now())
+            )
+            user = cursor.fetchone()
+            
+            if not user:
+                return {
+                    'statusCode': 401,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Недействительная сессия'}),
+                    'isBase64Encoded': False
+                }
+            
+            current_password = body.get('current_password', '')
+            new_password = body.get('new_password', '')
+            
+            cursor.execute(
+                f"SELECT password_hash FROM {schema}.users WHERE id = %s",
+                (user[0],)
+            )
+            stored_hash = cursor.fetchone()[0]
+            
+            current_hash, _ = hash_password(current_password, user[2])
+            
+            if current_hash != stored_hash:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Неверный текущий пароль'}),
+                    'isBase64Encoded': False
+                }
+            
+            is_strong, error_msg = validate_password_strength(new_password)
+            if not is_strong:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': error_msg}),
+                    'isBase64Encoded': False
+                }
+            
+            new_hash, new_salt = hash_password(new_password)
+            
+            cursor.execute(
+                f"UPDATE {schema}.users SET password_hash = %s, salt = %s WHERE id = %s",
+                (new_hash, new_salt, user[0])
+            )
+            
+            conn.commit()
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({
+                    'success': True,
+                    'message': 'Пароль успешно изменен'
                 }),
                 'isBase64Encoded': False
             }

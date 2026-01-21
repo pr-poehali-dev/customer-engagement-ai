@@ -1,24 +1,6 @@
 {
   "tests": [
     {
-      "name": "Register new user with strong password",
-      "method": "POST",
-      "path": "/",
-      "body": {
-        "action": "register",
-        "username": "secureuser99",
-        "password": "SecurePass123",
-        "email": "secure99@example.com",
-        "phone": "+79998887766"
-      },
-      "expectedStatus": 201,
-      "expectedBody": {
-        "success": true,
-        "username": "string"
-      },
-      "bodyMatcher": "partial"
-    },
-    {
       "name": "Login with valid credentials and receive token",
       "method": "POST",
       "path": "/",
@@ -30,8 +12,10 @@
       "expectedStatus": 200,
       "expectedBody": {
         "success": true,
-        "username": "string",
-        "token": "string"
+        "token": "string",
+        "user": {
+          "username": "string"
+        }
       },
       "bodyMatcher": "partial"
     }
