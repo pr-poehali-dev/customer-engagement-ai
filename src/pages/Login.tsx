@@ -238,7 +238,7 @@ const Login = () => {
                   </div>
                   <div className="flex items-start gap-2">
                     <Icon name="CheckCircle" size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm">Базовые AI сценарии</span>
+                    <span className="text-sm">Стандартные AI сценарии</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Icon name="CheckCircle" size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
