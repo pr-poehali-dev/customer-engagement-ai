@@ -9,6 +9,7 @@ import Icon from '@/components/ui/icon';
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -31,17 +32,9 @@ const Login = () => {
 
       const data = await response.json();
 
-      if (response.ok) {
-        localStorage.setItem('avt_user', JSON.stringify({
-          user_id: data.user_id,
-          username: data.username,
-          email: data.email,
-          phone: data.phone,
-          is_admin: data.is_admin || false
-        }));
-        localStorage.setItem('avt_token', data.token);
-        localStorage.setItem('avt_token_expiry', data.token_expiry);
-        localStorage.setItem('avt_auth', 'true');
+      if (response.ok && data.success) {
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('user_data', JSON.stringify(data.user));
         navigate('/dashboard');
       } else {
         setError(data.error || 'Неверный логин или пароль');
@@ -102,14 +95,22 @@ const Login = () => {
                   <div className="relative">
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       placeholder="Введите пароль..."
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pr-10 bg-muted/30"
+                      className="pr-20 bg-muted/30"
                       disabled={loading}
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-10 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                    >
+                      <Icon name={showPassword ? 'EyeOff' : 'Eye'} size={18} />
+                    </button>
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                       <Icon name="Lock" size={18} />
                     </div>
