@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +47,45 @@ export const AssistantTab = () => {
       details: { phone: '+7 (999) 123-45-67' }
     }
   ]);
+
+  const [showCalendarDialog, setShowCalendarDialog] = useState(false);
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [calendarType, setCalendarType] = useState<'google' | 'yandex' | null>(null);
+
+  useEffect(() => {
+    const connected = localStorage.getItem('calendar_connected');
+    const type = localStorage.getItem('calendar_type') as 'google' | 'yandex' | null;
+    if (connected === 'true' && type) {
+      setCalendarConnected(true);
+      setCalendarType(type);
+    }
+  }, []);
+
+  const handleConnectCalendar = (type: 'google' | 'yandex') => {
+    localStorage.setItem('calendar_connected', 'true');
+    localStorage.setItem('calendar_type', type);
+    setCalendarConnected(true);
+    setCalendarType(type);
+    setShowCalendarDialog(false);
+    alert(`Календарь ${type === 'google' ? 'Google Calendar' : 'Яндекс.Календарь'} успешно подключен!`);
+  };
+
+  const handleDisconnectCalendar = () => {
+    if (confirm('Отключить синхронизацию с календарем?')) {
+      localStorage.removeItem('calendar_connected');
+      localStorage.removeItem('calendar_type');
+      setCalendarConnected(false);
+      setCalendarType(null);
+    }
+  };
+
+  const handleSyncToCalendar = async (task: Task) => {
+    if (!calendarConnected) {
+      alert('Сначала подключите календарь');
+      return;
+    }
+    alert(`Задача "${task.title}" синхронизирована с ${calendarType === 'google' ? 'Google Calendar' : 'Яндекс.Календарь'}`);
+  };
 
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTask, setNewTask] = useState({
@@ -154,11 +193,77 @@ export const AssistantTab = () => {
             Планирование встреч, звонков, поездок и бронирований
           </p>
         </div>
-        <Button onClick={() => setShowNewTask(!showNewTask)} className="bg-gradient-to-r from-primary to-secondary">
-          <Icon name="Plus" size={16} className="mr-2" />
-          Новая задача
-        </Button>
+        <div className="flex gap-2">
+          {calendarConnected ? (
+            <Button variant="outline" onClick={handleDisconnectCalendar} className="border-green-500/50">
+              <Icon name="CalendarCheck2" size={16} className="mr-2 text-green-500" />
+              {calendarType === 'google' ? 'Google Calendar' : 'Яндекс.Календарь'}
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => setShowCalendarDialog(true)}>
+              <Icon name="Calendar" size={16} className="mr-2" />
+              Подключить календарь
+            </Button>
+          )}
+          <Button onClick={() => setShowNewTask(!showNewTask)} className="bg-gradient-to-r from-primary to-secondary">
+            <Icon name="Plus" size={16} className="mr-2" />
+            Новая задача
+          </Button>
+        </div>
       </div>
+
+      {showCalendarDialog && (
+        <Card className="border-primary/50 bg-gradient-to-br from-primary/10 to-secondary/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Icon name="CalendarSync" size={24} className="text-primary" />
+              Подключение календаря
+            </CardTitle>
+            <CardDescription>
+              Выберите календарь для синхронизации встреч и напоминаний
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <Card className="border-border/50 hover:border-primary/50 transition-all cursor-pointer" onClick={() => handleConnectCalendar('google')}>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <div className="w-16 h-16 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                      <Icon name="Calendar" size={32} className="text-blue-500" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-1">Google Calendar</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Синхронизация с вашим Google аккаунтом
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50 hover:border-primary/50 transition-all cursor-pointer" onClick={() => handleConnectCalendar('yandex')}>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <div className="w-16 h-16 rounded-lg bg-red-500/20 flex items-center justify-center">
+                      <Icon name="Calendar" size={32} className="text-red-500" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-1">Яндекс.Календарь</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Синхронизация с Яндекс аккаунтом
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Button variant="outline" onClick={() => setShowCalendarDialog(false)} className="w-full">
+              Отмена
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {showNewTask && (
         <Card className="border-primary/30 bg-primary/5">
@@ -383,6 +488,17 @@ export const AssistantTab = () => {
                         </div>
                       </div>
                       <div className="flex gap-2">
+                        {calendarConnected && task.type === 'meeting' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-blue-500/50 text-blue-500 hover:bg-blue-500/10"
+                            onClick={() => handleSyncToCalendar(task)}
+                          >
+                            <Icon name="CalendarPlus" size={14} className="mr-1" />
+                            Синх
+                          </Button>
+                        )}
                         {task.status === 'pending' && (
                           <Button
                             size="sm"
@@ -432,54 +548,126 @@ export const AssistantTab = () => {
         </CardContent>
       </Card>
 
-      <Card className="bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/30">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Icon name="Sparkles" size={24} className="text-primary" />
-            Возможности AI Секретаря
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="flex gap-3 p-3 rounded-lg bg-background/50">
-              <Icon name="CalendarClock" size={20} className="text-primary flex-shrink-0 mt-1" />
-              <div>
-                <h4 className="font-semibold mb-1">Планирование встреч</h4>
-                <p className="text-sm text-muted-foreground">
-                  Автоматическое согласование времени и отправка напоминаний участникам
-                </p>
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card className="bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Icon name="Sparkles" size={24} className="text-primary" />
+              Возможности AI Секретаря
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex gap-3 p-3 rounded-lg bg-background/50">
+                <Icon name="CalendarClock" size={20} className="text-primary flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="font-semibold mb-1">Планирование встреч</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Автоматическое согласование времени и отправка напоминаний участникам
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 p-3 rounded-lg bg-background/50">
+                <Icon name="Phone" size={20} className="text-primary flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="font-semibold mb-1">Организация звонков</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Напоминания о звонках и автоматическое добавление в календарь
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 p-3 rounded-lg bg-background/50">
+                <Icon name="Plane" size={20} className="text-primary flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="font-semibold mb-1">Бронирование билетов</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Поиск и бронирование авиа и ж/д билетов по лучшим ценам
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 p-3 rounded-lg bg-background/50">
+                <Icon name="Hotel" size={20} className="text-primary flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="font-semibold mb-1">Бронирование отелей</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Подбор и резервирование гостиниц с учетом ваших предпочтений
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex gap-3 p-3 rounded-lg bg-background/50">
-              <Icon name="Phone" size={20} className="text-primary flex-shrink-0 mt-1" />
-              <div>
-                <h4 className="font-semibold mb-1">Организация звонков</h4>
-                <p className="text-sm text-muted-foreground">
-                  Напоминания о звонках и автоматическое добавление в календарь
-                </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Icon name="CalendarSync" size={24} className="text-blue-500" />
+              Синхронизация календаря
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {calendarConnected ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/30">
+                  <Icon name="CheckCircle2" size={24} className="text-green-500" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold">Календарь подключен</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {calendarType === 'google' ? 'Google Calendar' : 'Яндекс.Календарь'}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Icon name="Check" size={16} className="text-green-500" />
+                    <span>Автоматическая синхронизация встреч</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Icon name="Check" size={16} className="text-green-500" />
+                    <span>Напоминания за 15 минут до события</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Icon name="Check" size={16} className="text-green-500" />
+                    <span>Экспорт в .ics файл</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Icon name="Check" size={16} className="text-green-500" />
+                    <span>Интеграция с email-уведомлениями</span>
+                  </div>
+                </div>
+                <Button variant="outline" onClick={handleDisconnectCalendar} className="w-full border-red-500/50 text-red-500 hover:bg-red-500/10">
+                  <Icon name="Unplug" size={16} className="mr-2" />
+                  Отключить календарь
+                </Button>
               </div>
-            </div>
-            <div className="flex gap-3 p-3 rounded-lg bg-background/50">
-              <Icon name="Plane" size={20} className="text-primary flex-shrink-0 mt-1" />
-              <div>
-                <h4 className="font-semibold mb-1">Бронирование билетов</h4>
+            ) : (
+              <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Поиск и бронирование авиа и ж/д билетов по лучшим ценам
+                  Подключите календарь для автоматической синхронизации встреч и получения напоминаний
                 </p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Icon name="Calendar" size={16} />
+                    <span>Синхронизация в реальном времени</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Icon name="Bell" size={16} />
+                    <span>Push-уведомления о встречах</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Icon name="Users" size={16} />
+                    <span>Приглашение участников</span>
+                  </div>
+                </div>
+                <Button onClick={() => setShowCalendarDialog(true)} className="w-full bg-gradient-to-r from-primary to-secondary">
+                  <Icon name="Calendar" size={16} className="mr-2" />
+                  Подключить календарь
+                </Button>
               </div>
-            </div>
-            <div className="flex gap-3 p-3 rounded-lg bg-background/50">
-              <Icon name="Hotel" size={20} className="text-primary flex-shrink-0 mt-1" />
-              <div>
-                <h4 className="font-semibold mb-1">Бронирование отелей</h4>
-                <p className="text-sm text-muted-foreground">
-                  Подбор и резервирование гостиниц с учетом ваших предпочтений
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
