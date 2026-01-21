@@ -119,9 +119,12 @@ const Pricing = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 Идеально для малого бизнеса и стартапов
               </p>
-              <Button className="w-full" variant="outline">
-                <Icon name="Sparkles" size={16} className="mr-2" />
-                Начать
+              <div className="mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <p className="text-xs font-semibold text-green-600">🎁 3 дня бесплатно</p>
+              </div>
+              <Button className="w-full" variant="outline" onClick={() => navigate('/dashboard')}>
+                <Icon name="CreditCard" size={16} className="mr-2" />
+                Оплатить
               </Button>
             </div>
           </Card>
@@ -144,9 +147,12 @@ const Pricing = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 Для растущих компаний с активными продажами
               </p>
-              <Button className="w-full bg-gradient-to-r from-primary to-secondary">
-                <Icon name="Crown" size={16} className="mr-2" />
-                Выбрать
+              <div className="mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <p className="text-xs font-semibold text-green-600">🎁 3 дня бесплатно</p>
+              </div>
+              <Button className="w-full bg-gradient-to-r from-primary to-secondary" onClick={() => navigate('/dashboard')}>
+                <Icon name="CreditCard" size={16} className="mr-2" />
+                Оплатить
               </Button>
             </div>
           </Card>
@@ -164,9 +170,12 @@ const Pricing = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 Для крупных организаций без ограничений
               </p>
-              <Button className="w-full" variant="outline">
-                <Icon name="Phone" size={16} className="mr-2" />
-                Связаться
+              <div className="mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <p className="text-xs font-semibold text-green-600">🎁 3 дня бесплатно</p>
+              </div>
+              <Button className="w-full" variant="outline" onClick={() => navigate('/dashboard')}>
+                <Icon name="CreditCard" size={16} className="mr-2" />
+                Оплатить
               </Button>
             </div>
           </Card>
