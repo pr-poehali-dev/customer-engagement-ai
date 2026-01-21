@@ -35,6 +35,7 @@ const Dashboard = () => {
   const [scenarios, setScenarios] = useState<any[]>([]);
   const [editingClient, setEditingClient] = useState<any | null>(null);
   const [clientEditDialogOpen, setClientEditDialogOpen] = useState(false);
+  const [isNewClient, setIsNewClient] = useState(false);
 
   useEffect(() => {
     const isAuth = localStorage.getItem('avt_auth');
@@ -116,14 +117,22 @@ const Dashboard = () => {
     }
   };
 
+  const handleAddClient = () => {
+    setEditingClient(null);
+    setIsNewClient(true);
+    setClientEditDialogOpen(true);
+  };
+
   const handleEditClient = (client: any) => {
     setEditingClient(client);
+    setIsNewClient(false);
     setClientEditDialogOpen(true);
   };
 
   const handleSaveClient = async (updatedClient: any) => {
     try {
-      const response = await fetch(`${API_URL}?path=update_client`, {
+      const endpoint = isNewClient ? 'add_client' : 'update_client';
+      const response = await fetch(`${API_URL}?path=${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ client: updatedClient })
@@ -132,11 +141,11 @@ const Dashboard = () => {
       if (response.ok) {
         const data = await response.json();
         setClients(data.clients || []);
-        alert('Клиент обновлен');
+        alert(isNewClient ? 'Клиент добавлен' : 'Клиент обновлен');
       }
     } catch (error) {
-      console.error('Update error:', error);
-      alert('Ошибка обновления клиента');
+      console.error('Save error:', error);
+      alert(isNewClient ? 'Ошибка добавления клиента' : 'Ошибка обновления клиента');
     }
   };
 
@@ -247,6 +256,7 @@ const Dashboard = () => {
               callingInProgress={callingInProgress}
               onImportClients={handleImportClients}
               onEditClient={handleEditClient}
+              onAddClient={handleAddClient}
             />
           </TabsContent>
 
@@ -290,6 +300,7 @@ const Dashboard = () => {
         open={clientEditDialogOpen}
         onClose={() => setClientEditDialogOpen(false)}
         onSave={handleSaveClient}
+        isNewClient={isNewClient}
       />
     </div>
   );

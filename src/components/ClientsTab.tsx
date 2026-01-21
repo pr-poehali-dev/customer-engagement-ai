@@ -16,9 +16,10 @@ interface ClientsTabProps {
   callingInProgress: {[key: number]: boolean};
   onImportClients: (clients: any[]) => void;
   onEditClient: (client: any) => void;
+  onAddClient: () => void;
 }
 
-export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callingInProgress, onImportClients, onEditClient }: ClientsTabProps) => {
+export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callingInProgress, onImportClients, onEditClient, onAddClient }: ClientsTabProps) => {
   const [importing, setImporting] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [selectedClients, setSelectedClients] = useState<any[]>([]);
@@ -126,7 +127,7 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
               <Icon name="Mail" size={16} className="mr-2" />
               Email рассылка
             </Button>
-            <Button className="bg-gradient-to-r from-primary to-secondary hover:opacity-90">
+            <Button onClick={onAddClient} className="bg-gradient-to-r from-primary to-secondary hover:opacity-90">
               <Icon name="Plus" size={16} className="mr-2" />
               Добавить клиента
             </Button>

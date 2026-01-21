@@ -29,18 +29,32 @@ interface ClientEditDialogProps {
   open: boolean;
   onClose: () => void;
   onSave: (updatedClient: Client) => void;
+  isNewClient?: boolean;
 }
 
-export const ClientEditDialog = ({ client, open, onClose, onSave }: ClientEditDialogProps) => {
+export const ClientEditDialog = ({ client, open, onClose, onSave, isNewClient = false }: ClientEditDialogProps) => {
   const [formData, setFormData] = useState<Client | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (client) {
-      setFormData({ ...client });
+    if (open) {
+      if (client) {
+        setFormData({ ...client });
+      } else if (isNewClient) {
+        setFormData({
+          id: Date.now(),
+          name: '',
+          email: '',
+          phone: '',
+          company: '',
+          legalAddress: '',
+          status: 'cold',
+          last_contact: 'Новый клиент'
+        });
+      }
       setErrors({});
     }
-  }, [client]);
+  }, [client, open, isNewClient]);
 
   if (!open || !formData) return null;
 
@@ -79,11 +93,11 @@ export const ClientEditDialog = ({ client, open, onClose, onSave }: ClientEditDi
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Icon name="UserCog" size={24} className="text-primary" />
-            Редактирование клиента
+            <Icon name={isNewClient ? "UserPlus" : "UserCog"} size={24} className="text-primary" />
+            {isNewClient ? 'Добавление клиента' : 'Редактирование клиента'}
           </CardTitle>
           <CardDescription>
-            Изменение информации о клиенте
+            {isNewClient ? 'Заполните информацию о новом клиенте' : 'Изменение информации о клиенте'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
