@@ -149,6 +149,25 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteClient = async (clientId: number) => {
+    try {
+      const response = await fetch(`${API_URL}?path=delete_client`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setClients(data.clients || []);
+        alert('Клиент удален');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Ошибка удаления клиента');
+    }
+  };
+
   const handleInitiateCall = async (clientId: number, phone: string) => {
     setCallingInProgress(prev => ({ ...prev, [clientId]: true }));
     try {
@@ -257,6 +276,7 @@ const Dashboard = () => {
               onImportClients={handleImportClients}
               onEditClient={handleEditClient}
               onAddClient={handleAddClient}
+              onDeleteClient={handleDeleteClient}
             />
           </TabsContent>
 
