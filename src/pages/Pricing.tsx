@@ -6,6 +6,20 @@ import Icon from '@/components/ui/icon';
 const Pricing = () => {
   const navigate = useNavigate();
 
+  const handlePayment = (plan: string, amount: number) => {
+    const isAuthenticated = localStorage.getItem('auth_token');
+    
+    if (!isAuthenticated) {
+      // Сохраняем выбранный тариф и направляем на регистрацию
+      localStorage.setItem('selected_plan', JSON.stringify({ plan, amount }));
+      navigate('/register');
+    } else {
+      // Переходим на страницу оплаты в личном кабинете
+      localStorage.setItem('selected_plan', JSON.stringify({ plan, amount }));
+      navigate('/dashboard?tab=payment');
+    }
+  };
+
   const features = [
     {
       category: 'База клиентов',
@@ -122,7 +136,7 @@ const Pricing = () => {
               <div className="mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
                 <p className="text-xs font-semibold text-green-600">🎁 3 дня бесплатно</p>
               </div>
-              <Button className="w-full" variant="outline" onClick={() => navigate('/dashboard')}>
+              <Button className="w-full" variant="outline" onClick={() => handlePayment('Стартовый', 5000)}>
                 <Icon name="CreditCard" size={16} className="mr-2" />
                 Оплатить
               </Button>
@@ -150,7 +164,7 @@ const Pricing = () => {
               <div className="mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
                 <p className="text-xs font-semibold text-green-600">🎁 3 дня бесплатно</p>
               </div>
-              <Button className="w-full bg-gradient-to-r from-primary to-secondary" onClick={() => navigate('/dashboard')}>
+              <Button className="w-full bg-gradient-to-r from-primary to-secondary" onClick={() => handlePayment('Профессиональный', 15000)}>
                 <Icon name="CreditCard" size={16} className="mr-2" />
                 Оплатить
               </Button>
@@ -173,7 +187,7 @@ const Pricing = () => {
               <div className="mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
                 <p className="text-xs font-semibold text-green-600">🎁 3 дня бесплатно</p>
               </div>
-              <Button className="w-full" variant="outline" onClick={() => navigate('/dashboard')}>
+              <Button className="w-full" variant="outline" onClick={() => handlePayment('Корпоративный', 35000)}>
                 <Icon name="CreditCard" size={16} className="mr-2" />
                 Оплатить
               </Button>

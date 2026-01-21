@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,22 @@ export const PaymentTab = () => {
   const [paymentId, setPaymentId] = useState('');
   const [showQR, setShowQR] = useState(false);
 
+  useEffect(() => {
+    // Проверяем, есть ли выбранный тариф
+    const selectedPlan = localStorage.getItem('selected_plan');
+    if (selectedPlan) {
+      try {
+        const plan = JSON.parse(selectedPlan);
+        setAmount(plan.amount.toString());
+        setDescription(`Оплата тарифа "${plan.plan}" - AVT Platform`);
+        // Очищаем после загрузки
+        localStorage.removeItem('selected_plan');
+      } catch (e) {
+        console.error('Ошибка загрузки тарифа:', e);
+      }
+    }
+  }, []);
+
   const handleCreatePayment = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       alert('Введите корректную сумму');
@@ -23,7 +39,7 @@ export const PaymentTab = () => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('avt_token');
+      const token = localStorage.getItem('auth_token');
 
       const response = await fetch(PAYMENT_API, {
         method: 'POST',

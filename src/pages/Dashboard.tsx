@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ const API_URL = 'https://functions.poehali.dev/0c17e1a7-ce1b-49a9-9ef7-f7cb2df73
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -36,9 +37,14 @@ const Dashboard = () => {
     if (!isAuth) {
       navigate('/');
     } else {
+      // Проверяем параметр tab в URL
+      const tabParam = searchParams.get('tab');
+      if (tabParam) {
+        setActiveTab(tabParam);
+      }
       loadData();
     }
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   const loadData = async () => {
     try {
