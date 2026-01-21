@@ -10,6 +10,7 @@ import { CallsTab } from '@/components/CallsTab';
 import { EmailsTab } from '@/components/EmailsTab';
 import { ScenarioBuilder } from '@/components/ScenarioBuilder';
 import { SettingsTab } from '@/components/SettingsTab';
+import { UsersTab } from '@/components/UsersTab';
 
 const API_URL = 'https://functions.poehali.dev/0c17e1a7-ce1b-49a9-9ef7-f7cb2df73405';
 
@@ -155,7 +156,7 @@ const Dashboard = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-muted/30 backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-7 bg-muted/30 backdrop-blur-sm">
             <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Icon name="LayoutDashboard" size={16} className="mr-2" />
               Дашборд
@@ -175,6 +176,10 @@ const Dashboard = () => {
             <TabsTrigger value="scenarios" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Icon name="Workflow" size={16} className="mr-2" />
               Сценарии AI
+            </TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Icon name="Shield" size={16} className="mr-2" />
+              Пользователи
             </TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Icon name="Settings" size={16} className="mr-2" />
@@ -216,6 +221,10 @@ const Dashboard = () => {
                 console.log('Save scenario:', scenario);
               }}
             />
+          </TabsContent>
+
+          <TabsContent value="users">
+            <UsersTab />
           </TabsContent>
 
           <TabsContent value="settings">

@@ -78,7 +78,7 @@ def handler(event: dict, context) -> dict:
             'headers': {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type'
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Authorization'
             },
             'body': '',
             'isBase64Encoded': False
@@ -86,8 +86,9 @@ def handler(event: dict, context) -> dict:
     
     try:
         client_ip = get_client_ip(event)
-        body = json.loads(event.get('body', '{}'))
-        action = body.get('action', 'login')
+        query_params = event.get('queryStringParameters', {}) or {}
+        body = json.loads(event.get('body', '{}')) if event.get('body') else {}
+        action = query_params.get('action') or body.get('action', 'login')
         
         dsn = os.environ.get('DATABASE_URL')
         schema = os.environ.get('MAIN_DB_SCHEMA', 't_p3568014_customer_engagement_')
@@ -192,7 +193,7 @@ def handler(event: dict, context) -> dict:
                 }
             
             cursor.execute(
-                f"SELECT id, username, email, phone, is_active, password_hash, salt FROM {schema}.users WHERE username = %s",
+                f"SELECT id, username, email, phone, is_active, password_hash, salt, is_admin FROM {schema}.users WHERE username = %s",
                 (username,)
             )
             user = cursor.fetchone()
@@ -208,6 +209,7 @@ def handler(event: dict, context) -> dict:
             
             stored_hash = user[5]
             salt = user[6]
+            is_admin = user[7] if len(user) > 7 else False
             password_hash, _ = hash_password(password, salt)
             
             if password_hash != stored_hash:
@@ -254,8 +256,62 @@ def handler(event: dict, context) -> dict:
                     'username': user[1],
                     'email': user[2],
                     'phone': user[3],
+                    'is_admin': is_admin,
                     'token': token,
                     'token_expiry': token_expiry.isoformat()
+                }),
+                'isBase64Encoded': False
+            }
+        
+        elif action == 'get_all_users':
+            headers = event.get('headers', {})
+            auth_header = headers.get('X-Authorization', headers.get('authorization', ''))
+            
+            if not auth_header:
+                return {
+                    'statusCode': 401,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Требуется авторизация'}),
+                    'isBase64Encoded': False
+                }
+            
+            token = auth_header.replace('Bearer ', '')
+            
+            cursor.execute(
+                f"SELECT id, username, is_admin FROM {schema}.users WHERE session_token = %s AND token_expiry > %s",
+                (token, datetime.now())
+            )
+            admin_user = cursor.fetchone()
+            
+            if not admin_user or not admin_user[2]:
+                return {
+                    'statusCode': 403,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Доступ запрещен. Требуются права администратора'}),
+                    'isBase64Encoded': False
+                }
+            
+            cursor.execute(
+                f"SELECT id, username, email, phone, created_at, last_login, is_active FROM {schema}.users ORDER BY created_at DESC"
+            )
+            users = cursor.fetchall()
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({
+                    'users': [
+                        {
+                            'user_id': u[0],
+                            'username': u[1],
+                            'email': u[2],
+                            'phone': u[3],
+                            'created_at': u[4].isoformat() if u[4] else None,
+                            'last_login': u[5].isoformat() if u[5] else None,
+                            'is_active': u[6]
+                        }
+                        for u in users
+                    ]
                 }),
                 'isBase64Encoded': False
             }

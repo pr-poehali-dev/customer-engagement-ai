@@ -36,7 +36,8 @@ const Login = () => {
           user_id: data.user_id,
           username: data.username,
           email: data.email,
-          phone: data.phone
+          phone: data.phone,
+          is_admin: data.is_admin || false
         }));
         localStorage.setItem('avt_token', data.token);
         localStorage.setItem('avt_token_expiry', data.token_expiry);
