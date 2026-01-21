@@ -88,21 +88,16 @@ const Register = () => {
               action: 'send_verification',
               email: formData.email,
               username: formData.username,
-              password: formData.password
+              password: formData.password,
+              verification_token: data.verification_token
             })
           });
         } catch (emailErr) {
           console.warn('Email отправка не удалась:', emailErr);
         }
         
-        localStorage.setItem('avt_user', JSON.stringify({
-          user_id: data.user_id,
-          username: data.username,
-          email: data.email
-        }));
-        localStorage.setItem('avt_auth', 'true');
-        alert('Регистрация успешна! Проверьте email для подтверждения данных входа.');
-        navigate('/dashboard');
+        alert(`Регистрация успешна! На ${formData.email} отправлено письмо с ссылкой для подтверждения. Проверьте почту и активируйте аккаунт.`);
+        navigate('/');
       } else {
         setError(data.error || 'Ошибка регистрации');
       }

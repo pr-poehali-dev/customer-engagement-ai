@@ -149,10 +149,19 @@ def handler(event: dict, context) -> dict:
             password_hash, salt = hash_password(password)
             
             cursor.execute(
-                f"INSERT INTO {schema}.users (username, password_hash, salt, email, phone, created_at) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                (username, password_hash, salt, email, phone, datetime.now())
+                f"INSERT INTO {schema}.users (username, password_hash, salt, email, phone, created_at, email_verified) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                (username, password_hash, salt, email, phone, datetime.now(), False)
             )
             user_id = cursor.fetchone()[0]
+            
+            verification_token = generate_token()
+            expires_at = datetime.now() + timedelta(days=7)
+            
+            cursor.execute(
+                f"INSERT INTO {schema}.email_verification_tokens (user_id, token, expires_at) VALUES (%s, %s, %s)",
+                (user_id, verification_token, expires_at)
+            )
+            
             conn.commit()
             
             return {
@@ -162,7 +171,8 @@ def handler(event: dict, context) -> dict:
                     'success': True,
                     'user_id': user_id,
                     'username': username,
-                    'email': email
+                    'email': email,
+                    'verification_token': verification_token
                 }),
                 'isBase64Encoded': False
             }
@@ -193,7 +203,7 @@ def handler(event: dict, context) -> dict:
                 }
             
             cursor.execute(
-                f"SELECT id, username, email, phone, is_active, password_hash, salt, is_admin FROM {schema}.users WHERE username = %s",
+                f"SELECT id, username, email, phone, is_active, password_hash, salt, is_admin, email_verified FROM {schema}.users WHERE username = %s",
                 (username,)
             )
             user = cursor.fetchone()
@@ -210,6 +220,7 @@ def handler(event: dict, context) -> dict:
             stored_hash = user[5]
             salt = user[6]
             is_admin = user[7] if len(user) > 7 else False
+            email_verified = user[8] if len(user) > 8 else True
             password_hash, _ = hash_password(password, salt)
             
             if password_hash != stored_hash:
@@ -218,6 +229,14 @@ def handler(event: dict, context) -> dict:
                     'statusCode': 401,
                     'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                     'body': json.dumps({'error': 'Неверный логин или пароль'}),
+                    'isBase64Encoded': False
+                }
+            
+            if not email_verified:
+                return {
+                    'statusCode': 403,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Email не подтверждён. Проверьте почту и перейдите по ссылке активации.'}),
                     'isBase64Encoded': False
                 }
             
@@ -333,6 +352,79 @@ def handler(event: dict, context) -> dict:
                 'body': json.dumps({
                     'success': True,
                     'message': 'Пароль успешно изменен'
+                }),
+                'isBase64Encoded': False
+            }
+        
+        elif action == 'verify_email':
+            token = body.get('token', '').strip()
+            
+            if not token:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Токен не указан'}),
+                    'isBase64Encoded': False
+                }
+            
+            cursor.execute(
+                f"SELECT user_id, expires_at, used FROM {schema}.email_verification_tokens WHERE token = %s",
+                (token,)
+            )
+            verification = cursor.fetchone()
+            
+            if not verification:
+                return {
+                    'statusCode': 404,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Недействительная ссылка активации'}),
+                    'isBase64Encoded': False
+                }
+            
+            user_id, expires_at, used = verification
+            
+            if used:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Ссылка активации уже использована'}),
+                    'isBase64Encoded': False
+                }
+            
+            if datetime.now() > expires_at:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Срок действия ссылки активации истёк'}),
+                    'isBase64Encoded': False
+                }
+            
+            cursor.execute(
+                f"UPDATE {schema}.users SET email_verified = TRUE WHERE id = %s",
+                (user_id,)
+            )
+            
+            cursor.execute(
+                f"UPDATE {schema}.email_verification_tokens SET used = TRUE WHERE token = %s",
+                (token,)
+            )
+            
+            cursor.execute(
+                f"SELECT username, email FROM {schema}.users WHERE id = %s",
+                (user_id,)
+            )
+            user_data = cursor.fetchone()
+            
+            conn.commit()
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({
+                    'success': True,
+                    'message': 'Email успешно подтверждён! Теперь вы можете войти в систему.',
+                    'username': user_data[0],
+                    'email': user_data[1]
                 }),
                 'isBase64Encoded': False
             }
