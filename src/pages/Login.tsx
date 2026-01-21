@@ -35,6 +35,8 @@ const Login = () => {
       if (response.ok && data.success) {
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('user_data', JSON.stringify(data.user));
+        localStorage.setItem('avt_auth', 'true');
+        localStorage.setItem('avt_user', JSON.stringify(data.user));
         navigate('/dashboard');
       } else {
         setError(data.error || 'Неверный логин или пароль');
