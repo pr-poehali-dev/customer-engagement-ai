@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {
+      "name": "Test email campaign endpoint exists",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "recipients": [
+          {
+            "name": "Test User",
+            "email": "test@example.com"
+          }
+        ],
+        "subject": "Test Campaign",
+        "message": "Test message"
+      },
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}

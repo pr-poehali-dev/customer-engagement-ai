@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { EmailCampaignDialog } from './EmailCampaignDialog';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,8 @@ interface ClientsTabProps {
 
 export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callingInProgress, onImportClients }: ClientsTabProps) => {
   const [importing, setImporting] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [selectedClients, setSelectedClients] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const downloadTemplate = () => {
@@ -104,6 +107,22 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
               <Icon name={importing ? "Loader2" : "Upload"} size={16} className={`mr-2 ${importing ? 'animate-spin' : ''}`} />
               Импорт из Excel
             </Button>
+            <Button 
+              variant="outline"
+              onClick={() => {
+                const clientsWithEmail = clients.filter(c => c.email && c.email.includes('@'));
+                if (clientsWithEmail.length === 0) {
+                  alert('Нет клиентов с email адресами');
+                  return;
+                }
+                setSelectedClients(clientsWithEmail);
+                setEmailDialogOpen(true);
+              }}
+              className="border-blue-500/50 hover:bg-blue-500/10"
+            >
+              <Icon name="Mail" size={16} className="mr-2" />
+              Email рассылка
+            </Button>
             <Button className="bg-gradient-to-r from-primary to-secondary hover:opacity-90">
               <Icon name="Plus" size={16} className="mr-2" />
               Добавить клиента
@@ -178,6 +197,15 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
           ))}
         </div>
       </Card>
+
+      <EmailCampaignDialog
+        open={emailDialogOpen}
+        onClose={() => setEmailDialogOpen(false)}
+        selectedClients={selectedClients}
+        onSendComplete={(result) => {
+          alert(`Рассылка завершена!\n✅ Отправлено: ${result.sent}\n❌ Ошибок: ${result.failed}\n\n📧 Отчет отправлен на zakaz6377@yandex.ru`);
+        }}
+      />
     </div>
   );
 };
