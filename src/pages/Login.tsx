@@ -38,6 +38,8 @@ const Login = () => {
           email: data.email,
           phone: data.phone
         }));
+        localStorage.setItem('avt_token', data.token);
+        localStorage.setItem('avt_token_expiry', data.token_expiry);
         localStorage.setItem('avt_auth', 'true');
         navigate('/dashboard');
       } else {

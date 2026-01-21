@@ -2,11 +2,74 @@ import json
 import os
 import hashlib
 import re
-from datetime import datetime
+import secrets
+import time
+from datetime import datetime, timedelta
 import psycopg2
 
+RATE_LIMIT = {}
+MAX_ATTEMPTS = 5
+LOCKOUT_TIME = 300
+
+def get_client_ip(event: dict) -> str:
+    '''Получить IP-адрес клиента'''
+    headers = event.get('headers', {})
+    forwarded = headers.get('X-Forwarded-For', '')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return event.get('requestContext', {}).get('identity', {}).get('sourceIp', 'unknown')
+
+def check_rate_limit(ip: str) -> tuple:
+    '''Проверка лимита попыток входа'''
+    current_time = time.time()
+    
+    if ip not in RATE_LIMIT:
+        RATE_LIMIT[ip] = {'attempts': 1, 'lockout_until': None}
+        return True, 0
+    
+    rate_data = RATE_LIMIT[ip]
+    
+    if rate_data['lockout_until'] and current_time < rate_data['lockout_until']:
+        remaining = int(rate_data['lockout_until'] - current_time)
+        return False, remaining
+    
+    if rate_data['lockout_until'] and current_time >= rate_data['lockout_until']:
+        RATE_LIMIT[ip] = {'attempts': 1, 'lockout_until': None}
+        return True, 0
+    
+    rate_data['attempts'] += 1
+    
+    if rate_data['attempts'] > MAX_ATTEMPTS:
+        rate_data['lockout_until'] = current_time + LOCKOUT_TIME
+        return False, LOCKOUT_TIME
+    
+    return True, 0
+
+def generate_token() -> str:
+    '''Генерация криптографически стойкого токена'''
+    return secrets.token_urlsafe(32)
+
+def hash_password(password: str, salt: str = None) -> tuple:
+    '''Хеширование пароля с солью'''
+    if salt is None:
+        salt = secrets.token_hex(16)
+    password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
+    return password_hash, salt
+
+def validate_password_strength(password: str) -> tuple:
+    '''Проверка сложности пароля'''
+    if len(password) < 8:
+        return False, 'Пароль должен содержать минимум 8 символов'
+    if not re.search(r'[A-Z]', password):
+        return False, 'Пароль должен содержать хотя бы одну заглавную букву'
+    if not re.search(r'[a-z]', password):
+        return False, 'Пароль должен содержать хотя бы одну строчную букву'
+    if not re.search(r'[0-9]', password):
+        return False, 'Пароль должен содержать хотя бы одну цифру'
+    return True, ''
+
 def handler(event: dict, context) -> dict:
-    '''API для регистрации и авторизации пользователей'''
+    '''API для регистрации и авторизации пользователей с защитой от атак'''
     method = event.get('httpMethod', 'GET')
     
     if method == 'OPTIONS':
@@ -22,6 +85,7 @@ def handler(event: dict, context) -> dict:
         }
     
     try:
+        client_ip = get_client_ip(event)
         body = json.loads(event.get('body', '{}'))
         action = body.get('action', 'login')
         
@@ -45,11 +109,12 @@ def handler(event: dict, context) -> dict:
                     'isBase64Encoded': False
                 }
             
-            if not password or len(password) < 6:
+            is_strong, error_msg = validate_password_strength(password)
+            if not is_strong:
                 return {
                     'statusCode': 400,
                     'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'body': json.dumps({'error': 'Пароль должен содержать минимум 6 символов'}),
+                    'body': json.dumps({'error': error_msg}),
                     'isBase64Encoded': False
                 }
             
@@ -80,11 +145,11 @@ def handler(event: dict, context) -> dict:
                     'isBase64Encoded': False
                 }
             
-            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            password_hash, salt = hash_password(password)
             
             cursor.execute(
-                f"INSERT INTO {schema}.users (username, password_hash, email, phone, created_at) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-                (username, password_hash, email, phone, datetime.now())
+                f"INSERT INTO {schema}.users (username, password_hash, salt, email, phone, created_at) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                (username, password_hash, salt, email, phone, datetime.now())
             )
             user_id = cursor.fetchone()[0]
             conn.commit()
@@ -102,6 +167,19 @@ def handler(event: dict, context) -> dict:
             }
         
         elif action == 'login':
+            allowed, lockout_time = check_rate_limit(client_ip)
+            
+            if not allowed:
+                return {
+                    'statusCode': 429,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({
+                        'error': f'Слишком много попыток входа. Повторите через {lockout_time} секунд',
+                        'lockout_seconds': lockout_time
+                    }),
+                    'isBase64Encoded': False
+                }
+            
             username = body.get('username', '').strip()
             password = body.get('password', '')
             
@@ -113,15 +191,27 @@ def handler(event: dict, context) -> dict:
                     'isBase64Encoded': False
                 }
             
-            password_hash = hashlib.sha256(password.encode()).hexdigest()
-            
             cursor.execute(
-                f"SELECT id, username, email, phone, is_active FROM {schema}.users WHERE username = %s AND password_hash = %s",
-                (username, password_hash)
+                f"SELECT id, username, email, phone, is_active, password_hash, salt FROM {schema}.users WHERE username = %s",
+                (username,)
             )
             user = cursor.fetchone()
             
             if not user:
+                time.sleep(0.5)
+                return {
+                    'statusCode': 401,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Неверный логин или пароль'}),
+                    'isBase64Encoded': False
+                }
+            
+            stored_hash = user[5]
+            salt = user[6]
+            password_hash, _ = hash_password(password, salt)
+            
+            if password_hash != stored_hash:
+                time.sleep(0.5)
                 return {
                     'statusCode': 401,
                     'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -137,8 +227,23 @@ def handler(event: dict, context) -> dict:
                     'isBase64Encoded': False
                 }
             
-            cursor.execute(f"UPDATE {schema}.users SET last_login = %s WHERE id = %s", (datetime.now(), user[0]))
+            token = generate_token()
+            token_expiry = datetime.now() + timedelta(days=7)
+            
+            cursor.execute(
+                f"UPDATE {schema}.users SET last_login = %s, session_token = %s, token_expiry = %s WHERE id = %s",
+                (datetime.now(), token, token_expiry, user[0])
+            )
+            
+            cursor.execute(
+                f"INSERT INTO {schema}.login_logs (user_id, ip_address, login_time, success) VALUES (%s, %s, %s, %s)",
+                (user[0], client_ip, datetime.now(), True)
+            )
+            
             conn.commit()
+            
+            if client_ip in RATE_LIMIT:
+                del RATE_LIMIT[client_ip]
             
             return {
                 'statusCode': 200,
@@ -148,7 +253,9 @@ def handler(event: dict, context) -> dict:
                     'user_id': user[0],
                     'username': user[1],
                     'email': user[2],
-                    'phone': user[3]
+                    'phone': user[3],
+                    'token': token,
+                    'token_expiry': token_expiry.isoformat()
                 }),
                 'isBase64Encoded': False
             }

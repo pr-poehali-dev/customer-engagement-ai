@@ -34,8 +34,26 @@ const Register = () => {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('Пароль должен содержать минимум 6 символов');
+    if (formData.password.length < 8) {
+      setError('Пароль должен содержать минимум 8 символов');
+      setLoading(false);
+      return;
+    }
+
+    if (!/[A-Z]/.test(formData.password)) {
+      setError('Пароль должен содержать хотя бы одну заглавную букву');
+      setLoading(false);
+      return;
+    }
+
+    if (!/[a-z]/.test(formData.password)) {
+      setError('Пароль должен содержать хотя бы одну строчную букву');
+      setLoading(false);
+      return;
+    }
+
+    if (!/[0-9]/.test(formData.password)) {
+      setError('Пароль должен содержать хотя бы одну цифру');
       setLoading(false);
       return;
     }
@@ -166,7 +184,7 @@ const Register = () => {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Минимум 6 символов"
+                  placeholder="8+ символов, A-z, 0-9"
                   value={formData.password}
                   onChange={(e) => handleChange('password', e.target.value)}
                   className="pr-10 bg-muted/30"
@@ -177,6 +195,9 @@ const Register = () => {
                   <Icon name="Lock" size={18} />
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Минимум 8 символов, заглавная и строчная буквы, цифры
+              </p>
             </div>
 
             <div className="space-y-2">
