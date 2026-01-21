@@ -15,9 +15,10 @@ interface ClientsTabProps {
   handleInitiateCall: (clientId: number, phone: string) => Promise<void>;
   callingInProgress: {[key: number]: boolean};
   onImportClients: (clients: any[]) => void;
+  onEditClient: (client: any) => void;
 }
 
-export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callingInProgress, onImportClients }: ClientsTabProps) => {
+export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callingInProgress, onImportClients, onEditClient }: ClientsTabProps) => {
   const [importing, setImporting] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [selectedClients, setSelectedClients] = useState<any[]>([]);
@@ -199,8 +200,8 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
                   <Button variant="ghost" size="icon" className="hover:bg-blue-500/20 hover:text-blue-600">
                     <Icon name="Mail" size={16} />
                   </Button>
-                  <Button variant="ghost" size="icon">
-                    <Icon name="MoreVertical" size={16} />
+                  <Button variant="ghost" size="icon" onClick={() => onEditClient(client)} className="hover:bg-primary/20 hover:text-primary">
+                    <Icon name="Edit" size={16} />
                   </Button>
                 </div>
               </div>

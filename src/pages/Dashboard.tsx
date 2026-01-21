@@ -13,6 +13,7 @@ import { SettingsTab } from '@/components/SettingsTab';
 import { UsersTab } from '@/components/UsersTab';
 import { PaymentTab } from '@/components/PaymentTab';
 import { AssistantTab } from '@/components/AssistantTab';
+import { ClientEditDialog } from '@/components/ClientEditDialog';
 
 const API_URL = 'https://functions.poehali.dev/0c17e1a7-ce1b-49a9-9ef7-f7cb2df73405';
 
@@ -32,6 +33,8 @@ const Dashboard = () => {
   const [emailCampaigns, setEmailCampaigns] = useState<any[]>([]);
   const [callingInProgress, setCallingInProgress] = useState<{[key: number]: boolean}>({});
   const [scenarios, setScenarios] = useState<any[]>([]);
+  const [editingClient, setEditingClient] = useState<any | null>(null);
+  const [clientEditDialogOpen, setClientEditDialogOpen] = useState(false);
 
   useEffect(() => {
     const isAuth = localStorage.getItem('avt_auth');
@@ -110,6 +113,30 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Import error:', error);
       alert('Ошибка импорта клиентов');
+    }
+  };
+
+  const handleEditClient = (client: any) => {
+    setEditingClient(client);
+    setClientEditDialogOpen(true);
+  };
+
+  const handleSaveClient = async (updatedClient: any) => {
+    try {
+      const response = await fetch(`${API_URL}?path=update_client`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client: updatedClient })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setClients(data.clients || []);
+        alert('Клиент обновлен');
+      }
+    } catch (error) {
+      console.error('Update error:', error);
+      alert('Ошибка обновления клиента');
     }
   };
 
@@ -207,8 +234,8 @@ const Dashboard = () => {
             <DashboardTab 
               stats={stats}
               recentCalls={recentCalls}
-              clients={clients}
               getStatusColor={getStatusColor}
+              loadData={loadData}
             />
           </TabsContent>
 
@@ -219,6 +246,7 @@ const Dashboard = () => {
               handleInitiateCall={handleInitiateCall}
               callingInProgress={callingInProgress}
               onImportClients={handleImportClients}
+              onEditClient={handleEditClient}
             />
           </TabsContent>
 
@@ -256,6 +284,13 @@ const Dashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ClientEditDialog
+        client={editingClient}
+        open={clientEditDialogOpen}
+        onClose={() => setClientEditDialogOpen(false)}
+        onSave={handleSaveClient}
+      />
     </div>
   );
 };
