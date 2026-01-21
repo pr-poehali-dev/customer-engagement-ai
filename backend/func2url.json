@@ -1,4 +1,5 @@
 {
+  "auth": "https://functions.poehali.dev/daf62ef7-d43d-4aae-9055-6da5a504ab7a",
   "password_recovery": "https://functions.poehali.dev/d60c175c-a740-4017-a1cb-c8a0f5ae9e88",
   "crm-api": "https://functions.poehali.dev/0c17e1a7-ce1b-49a9-9ef7-f7cb2df73405"
 }

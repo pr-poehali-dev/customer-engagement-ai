@@ -7,26 +7,47 @@ import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 
 const Login = () => {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      const savedPassword = localStorage.getItem('avt_password') || 'avt2025';
-      if (password === savedPassword) {
+    try {
+      const response = await fetch('https://functions.poehali.dev/daf62ef7-d43d-4aae-9055-6da5a504ab7a', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'login',
+          username: username,
+          password: password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('avt_user', JSON.stringify({
+          user_id: data.user_id,
+          username: data.username,
+          email: data.email,
+          phone: data.phone
+        }));
         localStorage.setItem('avt_auth', 'true');
         navigate('/dashboard');
       } else {
-        setError('Неверный пароль');
+        setError(data.error || 'Неверный логин или пароль');
       }
+    } catch (err) {
+      setError('Ошибка подключения к серверу');
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   return (
@@ -49,7 +70,28 @@ const Login = () => {
           <div className="lg:col-span-1">
             <Card className="p-8 backdrop-blur-sm bg-card/50 border-border/50 shadow-xl sticky top-8">
               <h3 className="text-lg font-bold mb-6 text-center">Вход в систему</h3>
-              <form onSubmit={handleLogin} className="space-y-6">
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="username" className="text-sm font-medium">
+                    Логин
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="username"
+                      type="text"
+                      placeholder="Введите логин..."
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="pr-10 bg-muted/30"
+                      disabled={loading}
+                      required
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      <Icon name="User" size={18} />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="password" className="text-sm font-medium">
                     Пароль
@@ -63,23 +105,25 @@ const Login = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       className="pr-10 bg-muted/30"
                       disabled={loading}
+                      required
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                       <Icon name="Lock" size={18} />
                     </div>
                   </div>
-                  {error && (
-                    <p className="text-sm text-red-500 flex items-center gap-1">
-                      <Icon name="AlertCircle" size={14} />
-                      {error}
-                    </p>
-                  )}
                 </div>
+
+                {error && (
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-2 text-red-600">
+                    <Icon name="AlertCircle" size={16} />
+                    <span className="text-sm">{error}</span>
+                  </div>
+                )}
 
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90"
-                  disabled={loading || !password}
+                  disabled={loading || !username || !password}
                 >
                   {loading ? (
                     <>
@@ -94,13 +138,20 @@ const Login = () => {
                   )}
                 </Button>
 
-                <div className="text-center">
+                <div className="flex items-center justify-between text-sm">
                   <button
                     type="button"
                     onClick={() => navigate('/password-recovery')}
-                    className="text-sm text-primary hover:underline"
+                    className="text-primary hover:underline"
                   >
                     Забыли пароль?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/register')}
+                    className="text-primary hover:underline"
+                  >
+                    Регистрация
                   </button>
                 </div>
               </form>
