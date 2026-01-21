@@ -18,7 +18,8 @@ const Login = () => {
     setLoading(true);
 
     setTimeout(() => {
-      if (password === 'avt2025') {
+      const savedPassword = localStorage.getItem('avt_password') || 'avt2025';
+      if (password === savedPassword) {
         localStorage.setItem('avt_auth', 'true');
         navigate('/dashboard');
       } else {
