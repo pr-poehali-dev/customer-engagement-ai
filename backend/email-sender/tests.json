@@ -1,0 +1,20 @@
+{
+  "tests": [
+    {
+      "name": "Send verification email",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "send_verification",
+        "email": "test@example.com",
+        "username": "testuser",
+        "password": "TestPass123"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

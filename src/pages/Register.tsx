@@ -80,13 +80,28 @@ const Register = () => {
       const data = await response.json();
 
       if (response.ok) {
+        try {
+          await fetch('https://functions.poehali.dev/18fc91cf-f81f-4a1d-9204-d70c0e98a563', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'send_verification',
+              email: formData.email,
+              username: formData.username,
+              password: formData.password
+            })
+          });
+        } catch (emailErr) {
+          console.warn('Email отправка не удалась:', emailErr);
+        }
+        
         localStorage.setItem('avt_user', JSON.stringify({
           user_id: data.user_id,
           username: data.username,
           email: data.email
         }));
         localStorage.setItem('avt_auth', 'true');
-        alert('Регистрация успешна! Добро пожаловать в AVT');
+        alert('Регистрация успешна! Проверьте email для подтверждения данных входа.');
         navigate('/dashboard');
       } else {
         setError(data.error || 'Ошибка регистрации');

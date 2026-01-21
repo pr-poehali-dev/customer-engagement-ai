@@ -10,9 +10,20 @@ const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Проверка сохраненных данных при загрузке
+  useState(() => {
+    const savedUsername = localStorage.getItem('saved_username');
+    const savedRemember = localStorage.getItem('remember_me');
+    if (savedUsername && savedRemember === 'true') {
+      setUsername(savedUsername);
+      setRememberMe(true);
+    }
+  });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +48,15 @@ const Login = () => {
         localStorage.setItem('user_data', JSON.stringify(data.user));
         localStorage.setItem('avt_auth', 'true');
         localStorage.setItem('avt_user', JSON.stringify(data.user));
+        
+        if (rememberMe) {
+          localStorage.setItem('saved_username', username);
+          localStorage.setItem('remember_me', 'true');
+        } else {
+          localStorage.removeItem('saved_username');
+          localStorage.removeItem('remember_me');
+        }
+        
         navigate('/dashboard');
       } else {
         setError(data.error || 'Неверный логин или пароль');
@@ -117,6 +137,19 @@ const Login = () => {
                       <Icon name="Lock" size={18} />
                     </div>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary"
+                  />
+                  <Label htmlFor="rememberMe" className="text-sm cursor-pointer">
+                    Запомнить меня
+                  </Label>
                 </div>
 
                 {error && (

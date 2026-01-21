@@ -1,4 +1,5 @@
 {
+  "email-sender": "https://functions.poehali.dev/18fc91cf-f81f-4a1d-9204-d70c0e98a563",
   "payment-sbp": "https://functions.poehali.dev/2ef13e90-2d73-467b-b7b7-aeb711fedb33",
   "auth": "https://functions.poehali.dev/daf62ef7-d43d-4aae-9055-6da5a504ab7a",
   "password_recovery": "https://functions.poehali.dev/d60c175c-a740-4017-a1cb-c8a0f5ae9e88",
