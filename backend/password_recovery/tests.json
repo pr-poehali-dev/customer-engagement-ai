@@ -1,0 +1,27 @@
+{
+  "tests": [
+    {
+      "name": "Test send recovery code",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "send_code",
+        "email": "zakaz6377@yandex.ru"
+      },
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test verify code",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "verify_code",
+        "code": "123456",
+        "sent_code": "123456"
+      },
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
