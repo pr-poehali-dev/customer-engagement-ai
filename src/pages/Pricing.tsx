@@ -217,7 +217,7 @@ const Pricing = () => {
                 <p className="text-sm text-muted-foreground mb-3">
                   Наши специалисты помогут подобрать оптимальный тариф для вашего бизнеса
                 </p>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => navigate('/register')}>
                   <Icon name="MessageCircle" size={14} className="mr-2" />
                   Связаться
                 </Button>
@@ -233,7 +233,7 @@ const Pricing = () => {
                 <p className="text-sm text-muted-foreground mb-3">
                   14 дней бесплатного использования Профессионального тарифа
                 </p>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => navigate('/register')}>
                   <Icon name="Rocket" size={14} className="mr-2" />
                   Попробовать
                 </Button>
@@ -249,7 +249,7 @@ const Pricing = () => {
                 <p className="text-sm text-muted-foreground mb-3">
                   Скидка до 20% при оплате за год и для некоммерческих организаций
                 </p>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => navigate('/register')}>
                   <Icon name="Gift" size={14} className="mr-2" />
                   Узнать больше
                 </Button>
