@@ -33,17 +33,42 @@ interface ClientEditDialogProps {
 
 export const ClientEditDialog = ({ client, open, onClose, onSave }: ClientEditDialogProps) => {
   const [formData, setFormData] = useState<Client | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (client) {
       setFormData({ ...client });
+      setErrors({});
     }
   }, [client]);
 
   if (!open || !formData) return null;
 
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Имя обязательно для заполнения';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email обязателен для заполнения';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Введите корректный email';
+    }
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Телефон обязателен для заполнения';
+    } else if (!/^[\d\s+()-]+$/.test(formData.phone) || formData.phone.replace(/\D/g, '').length < 10) {
+      newErrors.phone = 'Введите корректный номер телефона';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSave = () => {
-    if (formData) {
+    if (validateForm() && formData) {
       onSave(formData);
       onClose();
     }
@@ -64,12 +89,22 @@ export const ClientEditDialog = ({ client, open, onClose, onSave }: ClientEditDi
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Имя клиента</Label>
+              <Label>Имя клиента <span className="text-red-500">*</span></Label>
               <Input
                 placeholder="Иван Иванов"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  if (errors.name) setErrors({ ...errors, name: '' });
+                }}
+                className={errors.name ? 'border-red-500' : ''}
               />
+              {errors.name && (
+                <p className="text-xs text-red-500 flex items-center gap-1">
+                  <Icon name="AlertCircle" size={12} />
+                  {errors.name}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Статус</Label>
@@ -105,22 +140,42 @@ export const ClientEditDialog = ({ client, open, onClose, onSave }: ClientEditDi
           </div>
 
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label>Email <span className="text-red-500">*</span></Label>
             <Input
               type="email"
               placeholder="email@example.com"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, email: e.target.value });
+                if (errors.email) setErrors({ ...errors, email: '' });
+              }}
+              className={errors.email ? 'border-red-500' : ''}
             />
+            {errors.email && (
+              <p className="text-xs text-red-500 flex items-center gap-1">
+                <Icon name="AlertCircle" size={12} />
+                {errors.email}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label>Телефон</Label>
+            <Label>Телефон <span className="text-red-500">*</span></Label>
             <Input
               placeholder="+7 999 123-45-67"
               value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, phone: e.target.value });
+                if (errors.phone) setErrors({ ...errors, phone: '' });
+              }}
+              className={errors.phone ? 'border-red-500' : ''}
             />
+            {errors.phone && (
+              <p className="text-xs text-red-500 flex items-center gap-1">
+                <Icon name="AlertCircle" size={12} />
+                {errors.phone}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
