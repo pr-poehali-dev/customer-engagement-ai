@@ -20,6 +20,19 @@ interface Task {
 export const AssistantTab = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
 
+  useEffect(() => {
+    const savedTasks = localStorage.getItem('assistant_tasks');
+    if (savedTasks) {
+      setTasks(JSON.parse(savedTasks));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tasks.length > 0) {
+      localStorage.setItem('assistant_tasks', JSON.stringify(tasks));
+    }
+  }, [tasks]);
+
   const [showCalendarDialog, setShowCalendarDialog] = useState(false);
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [calendarType, setCalendarType] = useState<'google' | 'yandex' | null>(null);
@@ -86,7 +99,9 @@ export const AssistantTab = () => {
       details: newTask.details
     };
 
-    setTasks([...tasks, task]);
+    const updatedTasks = [...tasks, task];
+    setTasks(updatedTasks);
+    localStorage.setItem('assistant_tasks', JSON.stringify(updatedTasks));
     setShowNewTask(false);
     setNewTask({
       type: 'meeting',
@@ -99,14 +114,18 @@ export const AssistantTab = () => {
   };
 
   const handleUpdateStatus = (taskId: number, newStatus: Task['status']) => {
-    setTasks(tasks.map(task => 
+    const updatedTasks = tasks.map(task => 
       task.id === taskId ? { ...task, status: newStatus } : task
-    ));
+    );
+    setTasks(updatedTasks);
+    localStorage.setItem('assistant_tasks', JSON.stringify(updatedTasks));
   };
 
   const handleDeleteTask = (taskId: number) => {
     if (confirm('Удалить задачу?')) {
-      setTasks(tasks.filter(task => task.id !== taskId));
+      const updatedTasks = tasks.filter(task => task.id !== taskId);
+      setTasks(updatedTasks);
+      localStorage.setItem('assistant_tasks', JSON.stringify(updatedTasks));
     }
   };
 

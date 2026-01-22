@@ -36,6 +36,7 @@ const Dashboard = () => {
   const [editingClient, setEditingClient] = useState<any | null>(null);
   const [clientEditDialogOpen, setClientEditDialogOpen] = useState(false);
   const [isNewClient, setIsNewClient] = useState(false);
+  const [tasks, setTasks] = useState<any[]>([]);
 
   useEffect(() => {
     const isAuth = localStorage.getItem('avt_auth');
@@ -48,8 +49,16 @@ const Dashboard = () => {
         setActiveTab(tabParam);
       }
       loadData();
+      loadTasks();
     }
   }, [navigate, searchParams]);
+
+  const loadTasks = () => {
+    const savedTasks = localStorage.getItem('assistant_tasks');
+    if (savedTasks) {
+      setTasks(JSON.parse(savedTasks));
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -263,6 +272,7 @@ const Dashboard = () => {
               stats={stats}
               recentCalls={recentCalls}
               clients={clients}
+              tasks={tasks}
               getStatusColor={getStatusColor}
               loadData={loadData}
             />

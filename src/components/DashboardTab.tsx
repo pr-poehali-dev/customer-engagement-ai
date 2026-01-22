@@ -14,20 +14,21 @@ interface DashboardTabProps {
   };
   recentCalls: any[];
   clients: any[];
+  tasks: any[];
   getStatusColor: (status: string) => string;
   loadData: () => Promise<void>;
 }
 
-export const DashboardTab = ({ stats, recentCalls, clients, getStatusColor, loadData }: DashboardTabProps) => {
+export const DashboardTab = ({ stats, recentCalls, clients, tasks, getStatusColor, loadData }: DashboardTabProps) => {
   const hotClients = clients.filter(c => c.status === 'hot').length;
   const warmClients = clients.filter(c => c.status === 'warm').length;
-  const totalTasks = 0;
+  const pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length;
 
   const statsDisplay = [
     { label: 'Всего клиентов', value: stats.totalClients.toString(), change: '', icon: 'Users', color: 'text-primary' },
     { label: 'Звонков сегодня', value: stats.callsToday.toString(), change: '', icon: 'Phone', color: 'text-secondary' },
     { label: 'Горячих клиентов', value: hotClients.toString(), change: '', icon: 'Flame', color: 'text-red-500' },
-    { label: 'Теплых клиентов', value: warmClients.toString(), change: '', icon: 'Sun', color: 'text-orange-500' },
+    { label: 'Активных задач', value: pendingTasks.toString(), change: '', icon: 'ListTodo', color: 'text-purple-500' },
   ];
 
   return (
