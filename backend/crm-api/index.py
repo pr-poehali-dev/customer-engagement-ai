@@ -3,280 +3,168 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
-import urllib.request
-import urllib.parse
-import base64
+
+
+def get_db_connection():
+    '''Создает подключение к PostgreSQL'''
+    dsn = os.environ.get('DATABASE_URL')
+    if not dsn:
+        raise Exception('DATABASE_URL environment variable is not set')
+    return psycopg2.connect(dsn, cursor_factory=RealDictCursor)
+
 
 def handler(event: dict, context) -> dict:
-    '''API для управления CRM данными: клиенты, звонки, email кампании'''
+    '''Универсальный API для AVT CRM системы с функциями статистики, управления клиентами и звонками'''
     
     method = event.get('httpMethod', 'GET')
     
+    # CORS preflight
     if method == 'OPTIONS':
         return {
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type',
                 'Access-Control-Max-Age': '86400'
             },
-            'body': '',
-            'isBase64Encoded': False
+            'body': ''
         }
     
-    dsn = os.environ.get('DATABASE_URL')
-    if not dsn:
-        return error_response('DATABASE_URL not configured', 500)
-    
     try:
-        conn = psycopg2.connect(dsn)
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        qs_params = event.get('queryStringParameters')
-        path = qs_params.get('path', 'stats') if qs_params else 'stats'
+        # Определяем путь из query параметров
+        params = event.get('queryStringParameters', {}) or {}
+        path = params.get('path', 'stats')
         
-        if method == 'POST':
+        if method == 'GET':
+            if path == 'stats':
+                result = get_statistics(cursor)
+            elif path == 'clients':
+                result = get_clients(cursor)
+            elif path == 'calls':
+                result = get_calls(cursor)
+            else:
+                result = {'error': 'Unknown path'}
+        
+        elif method == 'POST':
             body_str = event.get('body', '{}')
-            body = json.loads(body_str) if isinstance(body_str, str) else body_str
+            body = json.loads(body_str) if body_str else {}
             
             if path == 'initiate_call':
                 result = initiate_call(cursor, conn, body)
-            elif path == 'import_clients':
-                result = import_clients(cursor, conn, body)
-            elif path == 'save_scenario':
-                result = save_scenario(cursor, conn, body)
-            elif path == 'delete_scenario':
-                result = delete_scenario(cursor, conn, body)
             else:
-                result = {'error': 'Unknown POST path'}
-        elif path == 'stats':
-            result = get_stats(cursor)
-        elif path == 'clients':
-            result = get_clients(cursor)
-        elif path == 'calls':
-            result = get_calls(cursor)
-        elif path == 'campaigns':
-            result = get_campaigns(cursor)
-        elif path == 'scenarios':
-            result = get_scenarios(cursor)
+                result = {'error': 'Unknown path'}
+        
         else:
-            result = {'error': 'Unknown path'}
+            result = {'error': 'Method not allowed'}
         
         cursor.close()
         conn.close()
         
         return success_response(result)
-        
+    
     except Exception as e:
-        return error_response(str(e), 500)
+        return error_response(str(e))
 
 
-def get_stats(cursor):
+def get_statistics(cursor):
+    '''Получает статистику CRM системы'''
+    
+    # Общее количество клиентов
     cursor.execute("SELECT COUNT(*) as total FROM clients")
     total_clients = cursor.fetchone()['total']
     
-    cursor.execute("SELECT COUNT(*) as total FROM calls WHERE DATE(created_at) = CURRENT_DATE")
-    calls_today = cursor.fetchone()['total']
+    # Клиенты по статусам
+    cursor.execute("""
+        SELECT status, COUNT(*) as count 
+        FROM clients 
+        GROUP BY status
+    """)
+    clients_by_status = {row['status']: row['count'] for row in cursor.fetchall()}
     
-    cursor.execute("SELECT SUM(sent) as total FROM email_campaigns")
-    emails_sent = cursor.fetchone()['total'] or 0
-    
+    # Статистика звонков
     cursor.execute("""
         SELECT 
-            ROUND(100.0 * COUNT(CASE WHEN status = 'success' THEN 1 END) / NULLIF(COUNT(*), 0), 0) as conversion
+            COUNT(*) as total_calls,
+            COUNT(CASE WHEN status = 'success' THEN 1 END) as successful_calls,
+            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_calls,
+            COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_calls
         FROM calls
     """)
-    conversion = cursor.fetchone()['conversion'] or 0
+    calls_stats = cursor.fetchone()
+    
+    # Email кампании
+    cursor.execute("""
+        SELECT 
+            COUNT(*) as total_campaigns,
+            SUM(sent) as total_sent,
+            SUM(opened) as total_opened,
+            SUM(clicked) as total_clicked
+        FROM email_campaigns
+    """)
+    email_stats = cursor.fetchone()
     
     return {
-        'totalClients': total_clients,
-        'callsToday': calls_today,
-        'emailsSent': int(emails_sent),
-        'conversion': int(conversion)
+        'clients': {
+            'total': total_clients,
+            'by_status': clients_by_status
+        },
+        'calls': dict(calls_stats),
+        'email_campaigns': dict(email_stats)
     }
 
 
 def get_clients(cursor):
+    '''Получает список всех клиентов'''
+    
     cursor.execute("""
         SELECT 
-            id, 
-            name, 
-            email, 
-            phone, 
-            status,
-            CASE 
-                WHEN last_contact > NOW() - INTERVAL '1 hour' THEN 
-                    EXTRACT(EPOCH FROM (NOW() - last_contact))::INT / 60 || ' минут назад'
-                WHEN last_contact > NOW() - INTERVAL '1 day' THEN 
-                    EXTRACT(EPOCH FROM (NOW() - last_contact))::INT / 3600 || ' часа назад'
-                ELSE 
-                    EXTRACT(EPOCH FROM (NOW() - last_contact))::INT / 86400 || ' дней назад'
-            END as last_contact
+            id, name, email, phone, status, 
+            last_contact, created_at
         FROM clients
         ORDER BY last_contact DESC
-        LIMIT 50
     """)
     
-    return cursor.fetchall()
+    clients = cursor.fetchall()
+    
+    # Конвертируем datetime в строки
+    for client in clients:
+        if client['last_contact']:
+            client['last_contact'] = client['last_contact'].isoformat()
+        if client['created_at']:
+            client['created_at'] = client['created_at'].isoformat()
+    
+    return {'clients': [dict(c) for c in clients]}
 
 
 def get_calls(cursor):
+    '''Получает историю звонков с информацией о клиентах'''
+    
     cursor.execute("""
         SELECT 
-            c.id,
-            cl.name as client,
-            c.status,
-            c.duration,
-            TO_CHAR(c.created_at, 'HH24:MI') as timestamp,
-            c.result
+            c.id, c.client_id, c.status, c.duration, 
+            c.result, c.created_at,
+            cl.name as client_name, cl.phone as client_phone
         FROM calls c
-        JOIN clients cl ON c.client_id = cl.id
+        LEFT JOIN clients cl ON c.client_id = cl.id
         ORDER BY c.created_at DESC
-        LIMIT 20
     """)
     
-    return cursor.fetchall()
-
-
-def get_campaigns(cursor):
-    cursor.execute("""
-        SELECT 
-            id,
-            name,
-            sent,
-            opened,
-            clicked,
-            status
-        FROM email_campaigns
-        ORDER BY created_at DESC
-    """)
+    calls = cursor.fetchall()
     
-    return cursor.fetchall()
-
-
-def get_scenarios(cursor):
-    cursor.execute("""
-        SELECT 
-            id,
-            name,
-            description,
-            steps,
-            status,
-            TO_CHAR(created_at, 'DD.MM.YYYY') as created
-        FROM scenarios
-        ORDER BY created_at DESC
-    """)
+    # Конвертируем datetime в строки
+    for call in calls:
+        if call['created_at']:
+            call['created_at'] = call['created_at'].isoformat()
     
-    return cursor.fetchall()
-
-
-def import_clients(cursor, conn, body):
-    '''Импортирует клиентов из Excel файла'''
-    
-    if not isinstance(body, dict):
-        return {'error': 'Invalid body format'}
-    
-    clients = body.get('clients', [])
-    
-    if not clients:
-        return {'error': 'No clients provided'}
-    
-    imported_count = 0
-    for client in clients:
-        try:
-            cursor.execute("""
-                INSERT INTO clients (name, email, phone, status, last_contact)
-                VALUES (%s, %s, %s, %s, NOW())
-            """, (
-                client.get('name', ''),
-                client.get('email', ''),
-                client.get('phone', ''),
-                client.get('status', 'cold')
-            ))
-            imported_count += 1
-        except Exception as e:
-            print(f'Error importing client: {e}')
-            continue
-    
-    conn.commit()
-    
-    return {
-        'success': True,
-        'imported': imported_count,
-        'message': f'Импортировано {imported_count} клиентов'
-    }
-
-
-def save_scenario(cursor, conn, body):
-    '''Сохраняет или обновляет сценарий AI бота'''
-    
-    if not isinstance(body, dict):
-        return {'error': 'Invalid body format'}
-    
-    scenario = body.get('scenario')
-    
-    if not scenario:
-        return {'error': 'No scenario provided'}
-    
-    scenario_id = scenario.get('id')
-    name = scenario.get('name', 'Новый сценарий')
-    description = scenario.get('description', '')
-    steps = json.dumps(scenario.get('steps', []))
-    status = scenario.get('status', 'draft')
-    
-    cursor.execute("""
-        SELECT id FROM scenarios WHERE id = %s
-    """, (scenario_id,))
-    
-    existing = cursor.fetchone()
-    
-    if existing:
-        cursor.execute("""
-            UPDATE scenarios 
-            SET name = %s, description = %s, steps = %s, status = %s, updated_at = NOW()
-            WHERE id = %s
-        """, (name, description, steps, status, scenario_id))
-    else:
-        cursor.execute("""
-            INSERT INTO scenarios (id, name, description, steps, status, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
-        """, (scenario_id, name, description, steps, status))
-    
-    conn.commit()
-    
-    return {
-        'success': True,
-        'scenario_id': scenario_id,
-        'message': 'Сценарий сохранен'
-    }
-
-
-def delete_scenario(cursor, conn, body):
-    '''Удаляет сценарий'''
-    
-    if not isinstance(body, dict):
-        return {'error': 'Invalid body format'}
-    
-    scenario_id = body.get('scenario_id')
-    
-    if not scenario_id:
-        return {'error': 'scenario_id is required'}
-    
-    cursor.execute("""
-        DELETE FROM scenarios WHERE id = %s
-    """, (scenario_id,))
-    
-    conn.commit()
-    
-    return {
-        'success': True,
-        'message': 'Сценарий удален'
-    }
+    return {'calls': [dict(c) for c in calls]}
 
 
 def initiate_call(cursor, conn, body):
-    '''Инициирует реальный звонок через Twilio API'''
+    '''Инициирует звонок клиенту через MANGO OFFICE API'''
     
     if not isinstance(body, dict):
         return {'error': 'Invalid body format'}
@@ -287,13 +175,30 @@ def initiate_call(cursor, conn, body):
     if not client_id or not phone:
         return {'error': 'client_id and phone are required'}
     
-    # Получаем Twilio credentials
-    account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
-    auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
-    twilio_phone = os.environ.get('TWILIO_PHONE_NUMBER')
+    # Получаем учетные данные MANGO OFFICE
+    vpbx_api_key = os.environ.get('MANGO_VPBX_API_KEY')
+    vpbx_api_salt = os.environ.get('MANGO_VPBX_API_SALT')
+    from_extension = os.environ.get('MANGO_FROM_EXTENSION')
+    from_number = os.environ.get('MANGO_FROM_NUMBER')
     
-    if not all([account_sid, auth_token, twilio_phone]):
-        return {'error': 'Twilio credentials not configured. Please add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER secrets.'}
+    if not all([vpbx_api_key, vpbx_api_salt, from_extension]):
+        # Если credentials не настроены, создаем запись в БД без реального звонка
+        cursor.execute("""
+            INSERT INTO calls (client_id, status, duration, result, created_at)
+            VALUES (%s, %s, %s, %s, NOW())
+            RETURNING id
+        """, (client_id, 'pending', '0:00', 'Ожидание настройки MANGO OFFICE API'))
+        
+        call_id = cursor.fetchone()['id']
+        conn.commit()
+        
+        return {
+            'success': True,
+            'call_id': call_id,
+            'message': f'Звонок добавлен в очередь. Для совершения реальных звонков настройте MANGO OFFICE API.',
+            'status': 'pending',
+            'demo_mode': True
+        }
     
     # Создаем запись звонка в БД
     cursor.execute("""
@@ -306,67 +211,90 @@ def initiate_call(cursor, conn, body):
     conn.commit()
     
     try:
-        # Инициируем звонок через Twilio API
-        url = f'https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Calls.json'
+        import urllib.request
+        import urllib.parse
+        import hashlib
+        import json as json_lib
         
-        # Создаем TwiML для голосового сообщения
-        twiml_url = 'http://twimlets.com/message?Message%5B0%5D=Hello%20from%20AVT%20CRM%20system'
+        # Подготовка данных для API MANGO OFFICE
+        # Документация: https://www.mango-office.ru/support/api/
+        
+        # Формируем JSON запрос
+        command_id = f"call_{call_id}_{int(datetime.now().timestamp())}"
+        
+        request_data = {
+            "command_id": command_id,
+            "from": {
+                "extension": from_extension,
+                "number": from_number or phone
+            },
+            "to_number": phone,
+            "line_number": from_number or "",
+            "sip_headers": {}
+        }
+        
+        json_request = json_lib.dumps(request_data, ensure_ascii=False)
+        
+        # Вычисляем sign (hash)
+        sign_string = vpbx_api_key + json_request + vpbx_api_salt
+        sign = hashlib.sha256(sign_string.encode('utf-8')).hexdigest()
+        
+        # Отправляем POST запрос к MANGO OFFICE API
+        url = 'https://app.mango-office.ru/vpbx/commands/callback'
         
         data = urllib.parse.urlencode({
-            'To': phone,
-            'From': twilio_phone,
-            'Url': twiml_url
+            'vpbx_api_key': vpbx_api_key,
+            'sign': sign,
+            'json': json_request
         }).encode('utf-8')
         
-        # Basic Auth для Twilio
-        credentials = f'{account_sid}:{auth_token}'
-        encoded_credentials = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
-        
         headers = {
-            'Authorization': f'Basic {encoded_credentials}',
             'Content-Type': 'application/x-www-form-urlencoded'
         }
         
         request = urllib.request.Request(url, data=data, headers=headers, method='POST')
         
-        with urllib.request.urlopen(request) as response:
-            result = json.loads(response.read().decode('utf-8'))
-            twilio_call_sid = result.get('sid')
-            call_status = result.get('status')
+        with urllib.request.urlopen(request, timeout=10) as response:
+            result = json_lib.loads(response.read().decode('utf-8'))
             
             # Обновляем запись звонка
             cursor.execute("""
                 UPDATE calls 
                 SET status = %s, result = %s
                 WHERE id = %s
-            """, ('success', f'Звонок совершен (SID: {twilio_call_sid})', call_id))
+            """, ('success', f'Звонок инициирован через MANGO OFFICE (command_id: {command_id})', call_id))
             conn.commit()
             
             return {
                 'success': True,
                 'call_id': call_id,
-                'twilio_sid': twilio_call_sid,
-                'message': f'Звонок на номер {phone} успешно инициирован',
-                'status': call_status
+                'mango_command_id': command_id,
+                'message': f'Звонок на номер {phone} успешно инициирован через MANGO OFFICE',
+                'status': 'success',
+                'mango_response': result
             }
     
     except urllib.error.HTTPError as e:
         error_body = e.read().decode('utf-8')
-        error_data = json.loads(error_body) if error_body else {}
-        error_message = error_data.get('message', str(e))
+        try:
+            error_data = json_lib.loads(error_body)
+            error_message = error_data.get('message', str(e))
+        except:
+            error_message = error_body or str(e)
         
         # Обновляем запись об ошибке
         cursor.execute("""
             UPDATE calls 
             SET status = %s, result = %s
             WHERE id = %s
-        """, ('failed', f'Ошибка: {error_message}', call_id))
+        """, ('failed', f'Ошибка MANGO OFFICE: {error_message}', call_id))
         conn.commit()
         
         return {
             'success': False,
+            'call_id': call_id,
             'error': error_message,
-            'details': error_data
+            'status': 'failed'
         }
     
     except Exception as e:
@@ -379,29 +307,31 @@ def initiate_call(cursor, conn, body):
         
         return {
             'success': False,
-            'error': str(e)
+            'call_id': call_id,
+            'error': str(e),
+            'status': 'failed'
         }
 
 
 def success_response(data):
+    '''Формирует успешный ответ'''
     return {
         'statusCode': 200,
         'headers': {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'
         },
-        'body': json.dumps(data, default=str),
-        'isBase64Encoded': False
+        'body': json.dumps(data, ensure_ascii=False, default=str)
     }
 
 
-def error_response(message, code=400):
+def error_response(error_message):
+    '''Формирует ответ с ошибкой'''
     return {
-        'statusCode': code,
+        'statusCode': 500,
         'headers': {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'
         },
-        'body': json.dumps({'error': message}),
-        'isBase64Encoded': False
+        'body': json.dumps({'error': error_message}, ensure_ascii=False)
     }
