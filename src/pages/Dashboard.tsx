@@ -262,6 +262,7 @@ const Dashboard = () => {
             <DashboardTab 
               stats={stats}
               recentCalls={recentCalls}
+              clients={clients}
               getStatusColor={getStatusColor}
               loadData={loadData}
             />
