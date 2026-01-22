@@ -21,13 +21,11 @@ export const DashboardTab = ({ stats, recentCalls, getStatusColor, loadData }: D
   const statsDisplay = [
     { label: 'Всего клиентов', value: stats.totalClients.toString(), change: '', icon: 'Users', color: 'text-primary' },
     { label: 'Звонков сегодня', value: stats.callsToday.toString(), change: '', icon: 'Phone', color: 'text-secondary' },
-    { label: 'Email отправлено', value: stats.emailsSent.toLocaleString(), change: '', icon: 'Mail', color: 'text-accent' },
-    { label: 'Конверсия', value: `${stats.conversion}%`, change: '', icon: 'TrendingUp', color: 'text-primary' },
   ];
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {statsDisplay.map((stat, index) => (
           <Card key={index} className="p-6 bg-card/50 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-all duration-300 hover:scale-105 animate-scale-in" style={{ animationDelay: `${index * 100}ms` }}>
             <div className="flex items-start justify-between">
