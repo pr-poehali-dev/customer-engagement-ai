@@ -14,7 +14,7 @@ def get_db_connection():
 
 
 def handler(event: dict, context) -> dict:
-    '''Универсальный API для AVT CRM системы с функциями статистики, управления клиентами и звонками'''
+    '''Универсальный API для AVT CRM системы с функциями статистики, управления клиентами, звонками и вебхуками MANGO OFFICE'''
     
     method = event.get('httpMethod', 'GET')
     
@@ -55,6 +55,8 @@ def handler(event: dict, context) -> dict:
             
             if path == 'initiate_call':
                 result = initiate_call(cursor, conn, body)
+            elif path == 'mango_webhook':
+                result = handle_mango_webhook(cursor, conn, body)
             else:
                 result = {'error': 'Unknown path'}
         
@@ -323,6 +325,170 @@ def success_response(data):
         },
         'body': json.dumps(data, ensure_ascii=False, default=str)
     }
+
+
+def handle_mango_webhook(cursor, conn, body):
+    '''Обрабатывает вебхуки от MANGO OFFICE о событиях звонков'''
+    
+    if not isinstance(body, dict):
+        return {'error': 'Invalid body format'}
+    
+    # MANGO OFFICE отправляет события в формате JSON
+    # Документация: https://www.mango-office.ru/support/api/webhooks/
+    
+    event_type = body.get('event')
+    call_data = body.get('call', {})
+    
+    # Извлекаем данные о звонке
+    entry_id = call_data.get('entry_id')  # Уникальный ID звонка в MANGO
+    call_state = call_data.get('call_state')  # Состояние: Appeared, Connected, Disconnected
+    from_number = call_data.get('from', {}).get('number', '')
+    to_number = call_data.get('to', {}).get('number', '')
+    duration = call_data.get('total_time', 0)  # Длительность в секундах
+    recording_url = call_data.get('recording', {}).get('url', '')  # URL записи разговора
+    
+    # Конвертируем длительность из секунд в MM:SS
+    duration_formatted = f"{duration // 60}:{duration % 60:02d}"
+    
+    # Ищем звонок в базе по номеру телефона клиента
+    cursor.execute("""
+        SELECT c.id, cl.id as client_id, cl.phone
+        FROM calls c
+        JOIN clients cl ON c.client_id = cl.id
+        WHERE cl.phone = %s
+        ORDER BY c.created_at DESC
+        LIMIT 1
+    """, (to_number,))
+    
+    call_record = cursor.fetchone()
+    
+    if not call_record:
+        # Создаем новую запись звонка, если не нашли
+        cursor.execute("""
+            SELECT id FROM clients WHERE phone = %s LIMIT 1
+        """, (to_number,))
+        
+        client_record = cursor.fetchone()
+        if not client_record:
+            return {'success': False, 'message': 'Client not found'}
+        
+        client_id = client_record['id']
+        
+        cursor.execute("""
+            INSERT INTO calls (client_id, status, duration, result, recording_url, created_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+            RETURNING id
+        """, (client_id, 'pending', '0:00', 'Звонок от MANGO OFFICE', recording_url))
+        
+        call_id = cursor.fetchone()['id']
+    else:
+        call_id = call_record['id']
+    
+    # Обновляем информацию о звонке в зависимости от состояния
+    if call_state == 'Connected':
+        status = 'success'
+        result = 'Разговор состоялся'
+    elif call_state == 'Disconnected':
+        status = 'success' if duration > 0 else 'failed'
+        result = f'Звонок завершен ({duration_formatted})' if duration > 0 else 'Не дозвонились'
+    else:
+        status = 'pending'
+        result = f'Звонок в процессе (состояние: {call_state})'
+    
+    cursor.execute("""
+        UPDATE calls 
+        SET status = %s, 
+            duration = %s, 
+            result = %s,
+            recording_url = %s
+        WHERE id = %s
+    """, (status, duration_formatted, result, recording_url or None, call_id))
+    
+    # Если есть запись разговора, запускаем транскрипцию
+    if recording_url and call_state == 'Disconnected':
+        # Получаем транскрипцию через MANGO OFFICE Speech API или сторонний сервис
+        transcript = get_call_transcript(recording_url)
+        if transcript:
+            cursor.execute("""
+                UPDATE calls 
+                SET transcript = %s
+                WHERE id = %s
+            """, (transcript, call_id))
+    
+    conn.commit()
+    
+    return {
+        'success': True,
+        'message': 'Webhook processed',
+        'call_id': call_id,
+        'event': event_type,
+        'call_state': call_state,
+        'duration': duration_formatted,
+        'recording_url': recording_url
+    }
+
+
+def get_call_transcript(recording_url):
+    '''Получает транскрипцию записи звонка через Yandex SpeechKit'''
+    
+    if not recording_url:
+        return None
+    
+    try:
+        import urllib.request
+        import base64
+        import time
+        
+        # Используем Yandex SpeechKit для транскрипции
+        # Документация: https://cloud.yandex.ru/docs/speechkit/
+        
+        yandex_api_key = os.environ.get('YANDEX_SPEECHKIT_API_KEY')
+        yandex_folder_id = os.environ.get('YANDEX_FOLDER_ID')
+        
+        if not yandex_api_key or not yandex_folder_id:
+            # Если нет ключей Yandex, пытаемся использовать альтернативу
+            return transcribe_with_alternative(recording_url)
+        
+        # Скачиваем аудио файл
+        audio_request = urllib.request.Request(recording_url)
+        with urllib.request.urlopen(audio_request, timeout=30) as audio_response:
+            audio_data = audio_response.read()
+        
+        # Отправляем на транскрипцию в Yandex SpeechKit
+        url = 'https://stt.api.cloud.yandex.net/speech/v1/stt:recognize'
+        
+        headers = {
+            'Authorization': f'Api-Key {yandex_api_key}',
+            'Content-Type': 'audio/ogg'
+        }
+        
+        params = urllib.parse.urlencode({
+            'lang': 'ru-RU',
+            'folderId': yandex_folder_id,
+            'format': 'oggopus'
+        })
+        
+        request = urllib.request.Request(
+            f'{url}?{params}',
+            data=audio_data,
+            headers=headers,
+            method='POST'
+        )
+        
+        with urllib.request.urlopen(request, timeout=60) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            transcript_text = result.get('result', '')
+            return transcript_text if transcript_text else 'Транскрипция недоступна'
+    
+    except Exception as e:
+        return f'Ошибка транскрипции: {str(e)}'
+
+
+def transcribe_with_alternative(recording_url):
+    '''Альтернативная транскрипция без API ключей (заглушка)'''
+    # В реальном проекте можно использовать другие сервисы транскрипции
+    # Например: OpenAI Whisper API, Google Speech-to-Text, и т.д.
+    return 'Транскрипция доступна после настройки Yandex SpeechKit или альтернативного сервиса'
 
 
 def error_response(error_message):
