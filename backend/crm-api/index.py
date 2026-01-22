@@ -3,6 +3,9 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
+import urllib.request
+import urllib.parse
+import base64
 
 def handler(event: dict, context) -> dict:
     '''API для управления CRM данными: клиенты, звонки, email кампании'''
@@ -273,7 +276,7 @@ def delete_scenario(cursor, conn, body):
 
 
 def initiate_call(cursor, conn, body):
-    '''Инициирует звонок клиенту и создает запись в базе данных'''
+    '''Инициирует реальный звонок через Twilio API'''
     
     if not isinstance(body, dict):
         return {'error': 'Invalid body format'}
@@ -284,21 +287,100 @@ def initiate_call(cursor, conn, body):
     if not client_id or not phone:
         return {'error': 'client_id and phone are required'}
     
+    # Получаем Twilio credentials
+    account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
+    auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
+    twilio_phone = os.environ.get('TWILIO_PHONE_NUMBER')
+    
+    if not all([account_sid, auth_token, twilio_phone]):
+        return {'error': 'Twilio credentials not configured. Please add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER secrets.'}
+    
+    # Создаем запись звонка в БД
     cursor.execute("""
         INSERT INTO calls (client_id, status, duration, result, created_at)
         VALUES (%s, %s, %s, %s, NOW())
         RETURNING id
-    """, (client_id, 'success', '0:00', 'Звонок инициирован'))
+    """, (client_id, 'pending', '0:00', 'Инициируется...'))
     
     call_id = cursor.fetchone()['id']
     conn.commit()
     
-    return {
-        'success': True,
-        'call_id': call_id,
-        'message': f'Звонок клиенту {phone} инициирован',
-        'status': 'in_progress'
-    }
+    try:
+        # Инициируем звонок через Twilio API
+        url = f'https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Calls.json'
+        
+        # Создаем TwiML для голосового сообщения
+        twiml_url = 'http://twimlets.com/message?Message%5B0%5D=Hello%20from%20AVT%20CRM%20system'
+        
+        data = urllib.parse.urlencode({
+            'To': phone,
+            'From': twilio_phone,
+            'Url': twiml_url
+        }).encode('utf-8')
+        
+        # Basic Auth для Twilio
+        credentials = f'{account_sid}:{auth_token}'
+        encoded_credentials = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
+        
+        headers = {
+            'Authorization': f'Basic {encoded_credentials}',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+        
+        request = urllib.request.Request(url, data=data, headers=headers, method='POST')
+        
+        with urllib.request.urlopen(request) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            twilio_call_sid = result.get('sid')
+            call_status = result.get('status')
+            
+            # Обновляем запись звонка
+            cursor.execute("""
+                UPDATE calls 
+                SET status = %s, result = %s
+                WHERE id = %s
+            """, ('success', f'Звонок совершен (SID: {twilio_call_sid})', call_id))
+            conn.commit()
+            
+            return {
+                'success': True,
+                'call_id': call_id,
+                'twilio_sid': twilio_call_sid,
+                'message': f'Звонок на номер {phone} успешно инициирован',
+                'status': call_status
+            }
+    
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8')
+        error_data = json.loads(error_body) if error_body else {}
+        error_message = error_data.get('message', str(e))
+        
+        # Обновляем запись об ошибке
+        cursor.execute("""
+            UPDATE calls 
+            SET status = %s, result = %s
+            WHERE id = %s
+        """, ('failed', f'Ошибка: {error_message}', call_id))
+        conn.commit()
+        
+        return {
+            'success': False,
+            'error': error_message,
+            'details': error_data
+        }
+    
+    except Exception as e:
+        cursor.execute("""
+            UPDATE calls 
+            SET status = %s, result = %s
+            WHERE id = %s
+        """, ('failed', f'Ошибка: {str(e)}', call_id))
+        conn.commit()
+        
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
 
 def success_response(data):
