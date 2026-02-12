@@ -159,6 +159,142 @@ def handler(event: dict, context) -> dict:
                 'isBase64Encoded': False
             }
         
+        elif action == 'send_call_summary':
+            to_email = body.get('to_email')
+            client_name = body.get('client_name')
+            company = body.get('company', '')
+            phone = body.get('phone', '')
+            duration = body.get('duration', '0:00')
+            status = body.get('status', 'unknown')
+            result = body.get('result', '')
+            summary = body.get('summary', '')
+            full_analysis = body.get('full_analysis', '')
+            
+            if not all([to_email, client_name]):
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Не все параметры указаны'}),
+                    'isBase64Encoded': False
+                }
+            
+            status_emoji = '✅' if status == 'success' else '⏳' if status == 'pending' else '❌'
+            status_text = 'Успешный' if status == 'success' else 'В процессе' if status == 'pending' else 'Неудачный'
+            
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = f'🤖 ИИ-анализ звонка: {client_name}'
+            msg['From'] = smtp_user
+            msg['To'] = to_email
+            
+            html_content = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 700px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                  <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="background: linear-gradient(to right, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">🤖 ИИ-Анализ звонка</h1>
+                    <p style="color: #64748b; margin-top: 10px;">Автоматический отчет YandexGPT агента</p>
+                  </div>
+                  
+                  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; color: white; margin-bottom: 25px;">
+                    <h2 style="margin: 0 0 15px 0; font-size: 24px;">👤 {client_name}</h2>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 14px;">
+                      <div>
+                        <strong>🏢 Компания:</strong> {company or 'Не указано'}
+                      </div>
+                      <div>
+                        <strong>📞 Телефон:</strong> {phone}
+                      </div>
+                      <div>
+                        <strong>⏱️ Длительность:</strong> {duration}
+                      </div>
+                      <div>
+                        <strong>{status_emoji} Статус:</strong> {status_text}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style="background-color: #f8fafc; border-left: 4px solid #6366f1; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                    <h3 style="color: #1e293b; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                      📋 Результат звонка
+                    </h3>
+                    <p style="color: #475569; margin: 0; font-size: 15px;">{result}</p>
+                  </div>
+                  
+                  <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 10px; margin-bottom: 25px;">
+                    <h3 style="color: white; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                      ✨ Краткое резюме ИИ
+                    </h3>
+                    <div style="background-color: rgba(255,255,255,0.95); padding: 15px; border-radius: 8px; color: #1e293b; font-size: 14px; line-height: 1.7; white-space: pre-wrap;">{summary}</div>
+                  </div>
+                  
+                  <div style="background-color: #fef3c7; border: 2px solid #fbbf24; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                    <h3 style="color: #92400e; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                      🎯 Полный анализ агента
+                    </h3>
+                    <div style="color: #78350f; font-size: 14px; line-height: 1.8; white-space: pre-wrap;">{full_analysis}</div>
+                  </div>
+                  
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://preview--customer-engagement-ai.poehali.dev/dashboard?tab=calls" 
+                       style="display: inline-block; background: linear-gradient(to right, #6366f1, #a855f7); color: white; padding: 14px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                      🔗 Открыть CRM систему
+                    </a>
+                  </div>
+                  
+                  <div style="border-top: 1px solid #e2e8f0; margin-top: 30px; padding-top: 20px; color: #94a3b8; font-size: 12px; text-align: center;">
+                    <p>Это письмо было создано автоматически YandexGPT агентом.</p>
+                    <p>📧 Для вопросов и настроек пишите на zakaz6377@yandex.ru</p>
+                    <p>© 2026 AVT Platform. Все права защищены.</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """
+            
+            text_content = f"""
+🤖 ИИ-АНАЛИЗ ЗВОНКА
+
+👤 Клиент: {client_name}
+🏢 Компания: {company or 'Не указано'}
+📞 Телефон: {phone}
+⏱️ Длительность: {duration}
+{status_emoji} Статус: {status_text}
+
+📋 Результат: {result}
+
+✨ КРАТКОЕ РЕЗЮМЕ ИИ:
+{summary}
+
+🎯 ПОЛНЫЙ АНАЛИЗ:
+{full_analysis}
+
+---
+🔗 Открыть CRM: https://preview--customer-engagement-ai.poehali.dev/dashboard?tab=calls
+
+© 2026 AVT Platform
+            """
+            
+            part1 = MIMEText(text_content, 'plain', 'utf-8')
+            part2 = MIMEText(html_content, 'html', 'utf-8')
+            
+            msg.attach(part1)
+            msg.attach(part2)
+            
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({
+                    'success': True,
+                    'message': f'Email с анализом звонка отправлен на {to_email}'
+                }),
+                'isBase64Encoded': False
+            }
+        
         return {
             'statusCode': 400,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},

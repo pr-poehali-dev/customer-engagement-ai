@@ -453,6 +453,9 @@ def handle_mango_webhook(cursor, conn, body):
                     SET notes = %s
                     WHERE id = %s
                 """, (f"🤖 ИИ-анализ:\n{ai_analysis}", call_id))
+                
+                # Отправляем email менеджеру с резюме звонка
+                send_call_summary_email(call_data, ai_analysis, duration_formatted)
     
     conn.commit()
     
@@ -727,6 +730,57 @@ def call_yandex_gpt_agent(transcript: str, client_name: str, company: str, promp
     
     except Exception as e:
         return f'Ошибка при обращении к YandexGPT агенту: {str(e)}'
+
+
+def send_call_summary_email(call_data: dict, ai_analysis: str, duration: str):
+    '''Отправляет email менеджеру с резюме звонка'''
+    
+    try:
+        import urllib.request
+        
+        # Email для уведомлений
+        manager_email = os.environ.get('MANAGER_EMAIL', 'zakaz6377@yandex.ru')
+        
+        # Формируем краткое резюме (первые 500 символов анализа)
+        summary = ai_analysis[:500] + '...' if len(ai_analysis) > 500 else ai_analysis
+        
+        # URL email-sender функции
+        email_sender_url = os.environ.get('EMAIL_SENDER_URL', 'https://functions.poehali.dev/d7c55d61-0ed1-4b68-8eef-43c3d14b93e2')
+        
+        email_payload = {
+            'action': 'send_call_summary',
+            'to_email': manager_email,
+            'client_name': call_data['name'],
+            'company': call_data.get('company', ''),
+            'phone': call_data['phone'],
+            'duration': duration,
+            'status': call_data['status'],
+            'result': call_data['result'],
+            'summary': summary,
+            'full_analysis': ai_analysis
+        }
+        
+        # Отправляем POST запрос к email-sender
+        data = json.dumps(email_payload, ensure_ascii=False).encode('utf-8')
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        
+        request = urllib.request.Request(
+            email_sender_url,
+            data=data,
+            headers=headers,
+            method='POST'
+        )
+        
+        with urllib.request.urlopen(request, timeout=10) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            return result.get('success', False)
+    
+    except Exception as e:
+        # Не прерываем основной процесс если email не отправился
+        print(f'Email notification error: {str(e)}')
+        return False
 
 
 def error_response(error_message):
