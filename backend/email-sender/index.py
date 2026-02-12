@@ -295,6 +295,108 @@ def handler(event: dict, context) -> dict:
                 'isBase64Encoded': False
             }
         
+        elif action == 'send_subscription_notification':
+            to_email = body.get('to_email')
+            subject = body.get('subject')
+            message = body.get('message')
+            name = body.get('name', 'Пользователь')
+            plan_type = body.get('plan_type', '')
+            days_left = body.get('days_left', 0)
+            auto_renew = body.get('auto_renew', False)
+            
+            if not all([to_email, subject, message]):
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Не все параметры указаны'}),
+                    'isBase64Encoded': False
+                }
+            
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = smtp_user
+            msg['To'] = to_email
+            
+            plan_names = {
+                'starter': 'Стартовый',
+                'professional': 'Профессиональный',
+                'enterprise': 'Корпоративный'
+            }
+            plan_name = plan_names.get(plan_type, plan_type)
+            
+            if auto_renew:
+                icon = '💳'
+                color = 'green'
+                status_text = 'Автопродление включено'
+                status_color = '#10b981'
+            else:
+                icon = '⏰'
+                color = 'orange'
+                status_text = 'Требуется продление'
+                status_color = '#f59e0b'
+            
+            html_content = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                  <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">{icon}</div>
+                    <h1 style="color: #1e293b; margin: 0;">AVT Platform</h1>
+                    <p style="color: #64748b; margin-top: 10px;">Уведомление о подписке</p>
+                  </div>
+                  
+                  <div style="background: linear-gradient(135deg, {status_color} 0%, {status_color}dd 100%); padding: 20px; border-radius: 10px; color: white; margin-bottom: 25px; text-align: center;">
+                    <h2 style="margin: 0 0 10px 0; font-size: 22px;">Здравствуйте, {name}!</h2>
+                    <p style="margin: 0; font-size: 16px;">Ваша подписка на тариф <strong>"{plan_name}"</strong></p>
+                    <p style="margin: 10px 0 0 0; font-size: 28px; font-weight: bold;">истекает через {days_left} дн.</p>
+                  </div>
+                  
+                  <div style="background-color: #f8fafc; border-left: 4px solid {status_color}; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                    <h3 style="color: #1e293b; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                      {status_text}
+                    </h3>
+                    <div style="color: #475569; font-size: 14px; line-height: 1.7; white-space: pre-wrap;">{message}</div>
+                  </div>
+                  
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://preview--customer-engagement-ai.poehali.dev/dashboard?tab=payment" 
+                       style="display: inline-block; background: linear-gradient(to right, #6366f1, #a855f7); color: white; padding: 14px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                      🔗 Управление подпиской
+                    </a>
+                  </div>
+                  
+                  <div style="border-top: 1px solid #e2e8f0; margin-top: 30px; padding-top: 20px; color: #94a3b8; font-size: 12px; text-align: center;">
+                    <p>Это письмо было отправлено автоматически. Пожалуйста, не отвечайте на него.</p>
+                    <p>© 2026 AVT Platform. Все права защищены.</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """
+            
+            text_content = message
+            
+            part1 = MIMEText(text_content, 'plain', 'utf-8')
+            part2 = MIMEText(html_content, 'html', 'utf-8')
+            
+            msg.attach(part1)
+            msg.attach(part2)
+            
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({
+                    'success': True,
+                    'message': f'Уведомление о подписке отправлено на {to_email}'
+                }),
+                'isBase64Encoded': False
+            }
+        
         return {
             'statusCode': 400,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},

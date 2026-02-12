@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { PricingPlans } from './PricingPlans';
 import { Badge } from '@/components/ui/badge';
+import { SubscriptionSettings } from './SubscriptionSettings';
 
 const PAYMENT_API_URL = 'https://functions.poehali.dev/904921a5-febc-4136-9455-b12df8b051ea';
 
@@ -209,12 +210,27 @@ export const PaymentTab = () => {
         </Card>
       )}
 
-      <div>
-        <h3 className="text-2xl font-bold mb-6">Тарифные планы</h3>
-        <PricingPlans 
-          currentPlan={currentSubscription?.plan_type} 
-          onPlanSelect={handleSelectPlan}
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <h3 className="text-2xl font-bold mb-6">Тарифные планы</h3>
+          <PricingPlans 
+            currentPlan={currentSubscription?.plan_type} 
+            onPlanSelect={handleSelectPlan}
+          />
+        </div>
+
+        <div>
+          <h3 className="text-2xl font-bold mb-6">Настройки</h3>
+          <SubscriptionSettings 
+            subscription={currentSubscription ? {
+              id: 0,
+              plan_type: currentSubscription.plan_type,
+              auto_renew: true,
+              end_date: currentSubscription.end_date
+            } : null}
+            onUpdate={loadSubscriptionData}
+          />
+        </div>
       </div>
 
       {paymentHistory.length > 0 && (
