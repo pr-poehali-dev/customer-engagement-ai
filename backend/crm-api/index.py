@@ -57,6 +57,10 @@ def handler(event: dict, context) -> dict:
                 result = initiate_call(cursor, conn, body)
             elif path == 'mango_webhook':
                 result = handle_mango_webhook(cursor, conn, body)
+            elif path == 'ai_analyze':
+                result = ai_analyze_call(cursor, body)
+            elif path == 'ai_suggest':
+                result = ai_suggest_action(cursor, body)
             else:
                 result = {'error': 'Unknown path'}
         
@@ -489,6 +493,205 @@ def transcribe_with_alternative(recording_url):
     # В реальном проекте можно использовать другие сервисы транскрипции
     # Например: OpenAI Whisper API, Google Speech-to-Text, и т.д.
     return 'Транскрипция доступна после настройки Yandex SpeechKit или альтернативного сервиса'
+
+
+def ai_analyze_call(cursor, body):
+    '''Анализирует звонок с помощью YandexGPT агента'''
+    
+    if not isinstance(body, dict):
+        return {'error': 'Invalid body format'}
+    
+    call_id = body.get('call_id')
+    if not call_id:
+        return {'error': 'call_id is required'}
+    
+    # Получаем данные о звонке
+    cursor.execute("""
+        SELECT c.*, cl.name, cl.company, cl.email, cl.phone
+        FROM calls c
+        JOIN clients cl ON c.client_id = cl.id
+        WHERE c.id = %s
+    """, (call_id,))
+    
+    call = cursor.fetchone()
+    if not call:
+        return {'error': 'Call not found'}
+    
+    transcript = call.get('transcript', '')
+    if not transcript:
+        return {'error': 'No transcript available', 'message': 'Дождитесь завершения транскрипции'}
+    
+    # Вызываем YandexGPT агента для анализа
+    analysis = call_yandex_gpt_agent(
+        transcript=transcript,
+        client_name=call['name'],
+        company=call['company'],
+        prompt=f"""Проанализируй звонок с клиентом {call['name']} из компании {call['company']}.
+        
+Транскрипция разговора:
+{transcript}
+
+Выдели:
+1. Основную цель звонка
+2. Ключевые вопросы клиента
+3. Договоренности и следующие шаги
+4. Настроение клиента (заинтересован/нейтрален/недоволен)
+5. Рекомендации менеджеру"""
+    )
+    
+    return {
+        'success': True,
+        'call_id': call_id,
+        'analysis': analysis,
+        'client': {
+            'name': call['name'],
+            'company': call['company'],
+            'email': call['email'],
+            'phone': call['phone']
+        },
+        'call_info': {
+            'duration': call['duration'],
+            'status': call['status'],
+            'result': call['result'],
+            'created_at': call['created_at'].isoformat() if call['created_at'] else None
+        }
+    }
+
+
+def ai_suggest_action(cursor, body):
+    '''Предлагает следующее действие для клиента с помощью YandexGPT агента'''
+    
+    if not isinstance(body, dict):
+        return {'error': 'Invalid body format'}
+    
+    client_id = body.get('client_id')
+    if not client_id:
+        return {'error': 'client_id is required'}
+    
+    # Получаем данные клиента и историю звонков
+    cursor.execute("""
+        SELECT * FROM clients WHERE id = %s
+    """, (client_id,))
+    
+    client = cursor.fetchone()
+    if not client:
+        return {'error': 'Client not found'}
+    
+    # История звонков
+    cursor.execute("""
+        SELECT id, status, duration, result, transcript, created_at
+        FROM calls
+        WHERE client_id = %s
+        ORDER BY created_at DESC
+        LIMIT 5
+    """, (client_id,))
+    
+    calls_history = cursor.fetchall()
+    
+    # Формируем контекст для агента
+    history_text = "\n".join([
+        f"- {call['created_at'].strftime('%d.%m.%Y')}: {call['result']} (длительность: {call['duration']})"
+        for call in calls_history
+    ])
+    
+    last_transcript = calls_history[0].get('transcript', '') if calls_history else ''
+    
+    suggestion = call_yandex_gpt_agent(
+        transcript=last_transcript,
+        client_name=client['name'],
+        company=client['company'],
+        prompt=f"""Клиент: {client['name']} из компании {client['company']}
+Email: {client['email']}
+Телефон: {client['phone']}
+Статус: {client['status']}
+
+История звонков:
+{history_text}
+
+Последний разговор:
+{last_transcript if last_transcript else 'Нет транскрипции'}
+
+На основе истории взаимодействия предложи:
+1. Наиболее подходящее следующее действие (звонок, письмо, встреча)
+2. Когда лучше связаться
+3. О чем говорить / что предложить
+4. Ключевые моменты для обсуждения"""
+    )
+    
+    return {
+        'success': True,
+        'client_id': client_id,
+        'client': {
+            'name': client['name'],
+            'company': client['company'],
+            'email': client['email'],
+            'phone': client['phone'],
+            'status': client['status']
+        },
+        'suggestion': suggestion,
+        'calls_count': len(calls_history)
+    }
+
+
+def call_yandex_gpt_agent(transcript: str, client_name: str, company: str, prompt: str) -> str:
+    '''Вызывает YandexGPT агента для анализа и генерации рекомендаций'''
+    
+    try:
+        import urllib.request
+        import urllib.parse
+        
+        yandex_api_key = os.environ.get('YANDEX_API_KEY')
+        yandex_folder_id = os.environ.get('YANDEX_FOLDER_ID')
+        
+        if not yandex_api_key or not yandex_folder_id:
+            return 'Для использования ИИ-анализа настройте YANDEX_API_KEY и YANDEX_FOLDER_ID'
+        
+        # URI агента из запроса
+        agent_uri = 'gpt://b1gjbflgkc6kmaki44db/yandexgpt/rc'
+        
+        # Формируем запрос к YandexGPT Agent API
+        url = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion'
+        
+        request_data = {
+            'modelUri': agent_uri,
+            'completionOptions': {
+                'stream': False,
+                'temperature': 0.7,
+                'maxTokens': 2000
+            },
+            'messages': [
+                {
+                    'role': 'system',
+                    'text': 'Ты — ИИ-помощник для CRM системы компании по продаже автозапчастей. Помогаешь менеджерам анализировать звонки и планировать работу с клиентами.'
+                },
+                {
+                    'role': 'user',
+                    'text': prompt
+                }
+            ]
+        }
+        
+        headers = {
+            'Authorization': f'Api-Key {yandex_api_key}',
+            'Content-Type': 'application/json',
+            'x-folder-id': yandex_folder_id
+        }
+        
+        data = json.dumps(request_data, ensure_ascii=False).encode('utf-8')
+        request = urllib.request.Request(url, data=data, headers=headers, method='POST')
+        
+        with urllib.request.urlopen(request, timeout=30) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            
+            # Извлекаем текст ответа из структуры YandexGPT
+            alternatives = result.get('result', {}).get('alternatives', [])
+            if alternatives:
+                return alternatives[0].get('message', {}).get('text', 'Ответ не получен')
+            
+            return 'Ошибка получения ответа от агента'
+    
+    except Exception as e:
+        return f'Ошибка при обращении к YandexGPT агенту: {str(e)}'
 
 
 def error_response(error_message):
