@@ -25,7 +25,7 @@ export const DashboardTab = ({ stats, recentCalls, clients, tasks, getStatusColo
   const pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length;
 
   const statsDisplay = [
-    { label: 'Звонков сегодня', value: stats.callsToday.toString(), change: '', icon: 'Phone', color: 'text-secondary' },
+    { label: 'Звонков сегодня', value: (stats?.callsToday || 0).toString(), change: '', icon: 'Phone', color: 'text-secondary' },
     { label: 'Горячих клиентов', value: hotClients.toString(), change: '', icon: 'Flame', color: 'text-red-500' },
     { label: 'Активных задач', value: pendingTasks.toString(), change: '', icon: 'ListTodo', color: 'text-purple-500' },
   ];
