@@ -1,0 +1,40 @@
+{
+  "tests": [
+    {
+      "name": "Get available plans",
+      "method": "GET",
+      "path": "/?path=plans",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "plans": "array"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Check user subscription (no user_id)",
+      "method": "GET",
+      "path": "/?path=subscription",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "error": "user_id is required"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create payment without credentials",
+      "method": "POST",
+      "path": "/?path=create_payment",
+      "body": {
+        "user_id": 1,
+        "plan_type": "professional",
+        "billing_period": "monthly"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "demo_mode": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

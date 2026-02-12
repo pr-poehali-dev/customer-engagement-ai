@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { useSubscription } from '@/hooks/useSubscription';
 
 interface Call {
   id: number;
@@ -30,6 +31,7 @@ interface CallsTabProps {
 const API_URL = 'https://functions.poehali.dev/0c17e1a7-ce1b-49a9-9ef7-f7cb2df73405';
 
 export const CallsTab = ({ recentCalls, getStatusColor, onAnalyzeCall }: CallsTabProps) => {
+  const { hasFeature } = useSubscription();
   const [analyzingCall, setAnalyzingCall] = useState<number | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<{
     analysis: string;
@@ -40,6 +42,11 @@ export const CallsTab = ({ recentCalls, getStatusColor, onAnalyzeCall }: CallsTa
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
   const handleAnalyzeCall = async (callId: number) => {
+    if (!hasFeature('ai_analysis')) {
+      alert('ИИ-анализ доступен только на тарифах Professional и Enterprise. Перейдите в раздел "Оплата" для обновления тарифа.');
+      return;
+    }
+
     setLoadingAnalysis(true);
     setAnalyzingCall(callId);
     

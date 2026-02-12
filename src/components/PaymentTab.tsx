@@ -1,65 +1,93 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
+import { PricingPlans } from './PricingPlans';
+import { Badge } from '@/components/ui/badge';
 
-const PAYMENT_API = 'https://functions.poehali.dev/2ef13e90-2d73-467b-b7b7-aeb711fedb33';
+const PAYMENT_API_URL = 'https://functions.poehali.dev/904921a5-febc-4136-9455-b12df8b051ea';
 
 export const PaymentTab = () => {
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('Оплата услуг AVT');
-  const [loading, setLoading] = useState(false);
-  const [qrCode, setQrCode] = useState('');
-  const [paymentId, setPaymentId] = useState('');
-  const [showQR, setShowQR] = useState(false);
+  const [currentSubscription, setCurrentSubscription] = useState<{
+    plan_type: string;
+    end_date: string;
+    max_clients: number;
+    max_calls_per_month: number;
+    max_email_campaigns: number;
+  } | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<Array<{
+    id: number;
+    amount: string;
+    currency: string;
+    status: string;
+    created_at: string;
+    plan_type?: string;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   useEffect(() => {
-    // Проверяем, есть ли выбранный тариф
-    const selectedPlan = localStorage.getItem('selected_plan');
-    if (selectedPlan) {
-      try {
-        const plan = JSON.parse(selectedPlan);
-        setAmount(plan.amount.toString());
-        setDescription(`Оплата тарифа "${plan.plan}" - AVT Platform`);
-        // Очищаем после загрузки
-        localStorage.removeItem('selected_plan');
-      } catch (e) {
-        console.error('Ошибка загрузки тарифа:', e);
-      }
-    }
+    loadSubscriptionData();
   }, []);
 
-  const handleCreatePayment = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      alert('Введите корректную сумму');
-      return;
-    }
-
+  const loadSubscriptionData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('auth_token');
+      const authData = localStorage.getItem('avt_auth');
+      if (!authData) return;
+      
+      const { user_id } = JSON.parse(authData);
+      
+      const [subRes, historyRes] = await Promise.all([
+        fetch(`${PAYMENT_API_URL}?path=subscription&user_id=${user_id}`),
+        fetch(`${PAYMENT_API_URL}?path=payment_history&user_id=${user_id}`)
+      ]);
+      
+      if (subRes.ok) {
+        const data = await subRes.json();
+        setCurrentSubscription(data.subscription);
+      }
+      
+      if (historyRes.ok) {
+        const data = await historyRes.json();
+        setPaymentHistory(data.payments || []);
+      }
+    } catch (error) {
+      console.error('Error loading subscription:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const response = await fetch(PAYMENT_API, {
+  const handleSelectPlan = async (planType: string, billingPeriod: 'monthly' | 'yearly') => {
+    try {
+      setProcessingPayment(true);
+      const authData = localStorage.getItem('avt_auth');
+      if (!authData) {
+        alert('Необходима авторизация');
+        return;
+      }
+      
+      const { user_id } = JSON.parse(authData);
+      
+      const response = await fetch(`${PAYMENT_API_URL}?path=create_payment`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'create_payment',
-          amount: parseFloat(amount),
-          description: description
+          user_id,
+          plan_type: planType,
+          billing_period: billingPeriod,
+          return_url: window.location.href
         })
       });
-
+      
       const data = await response.json();
-
-      if (response.ok && data.success) {
-        setQrCode(data.qr_code);
-        setPaymentId(data.payment_id);
-        setShowQR(true);
+      
+      if (data.success && data.confirmation_url) {
+        window.location.href = data.confirmation_url;
+      } else if (data.demo_mode) {
+        alert('Демо-режим: ' + data.message);
+        loadSubscriptionData();
       } else {
         alert(data.error || 'Ошибка создания платежа');
       }
@@ -67,154 +95,146 @@ export const PaymentTab = () => {
       console.error('Payment error:', error);
       alert('Ошибка подключения к серверу');
     } finally {
-      setLoading(false);
+      setProcessingPayment(false);
     }
   };
 
-  const handleNewPayment = () => {
-    setShowQR(false);
-    setQrCode('');
-    setPaymentId('');
-    setAmount('');
-    setDescription('Оплата услуг AVT');
+  const handleCancelSubscription = async () => {
+    if (!confirm('Вы уверены, что хотите отменить подписку?')) return;
+    
+    try {
+      const authData = localStorage.getItem('avt_auth');
+      if (!authData) return;
+      
+      const { user_id } = JSON.parse(authData);
+      
+      const response = await fetch(`${PAYMENT_API_URL}?path=cancel_subscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id })
+      });
+      
+      if (response.ok) {
+        alert('Подписка отменена');
+        loadSubscriptionData();
+      }
+    } catch (error) {
+      console.error('Cancel error:', error);
+    }
   };
 
-  const handleDownloadQR = () => {
-    const link = document.createElement('a');
-    link.href = qrCode;
-    link.download = `payment-${paymentId}.png`;
-    link.click();
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ru-RU', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
   };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'succeeded':
+        return <Badge className="bg-green-500/20 text-green-600 border-green-500/30">Успешно</Badge>;
+      case 'pending':
+        return <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30">Ожидание</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-gray-500/20 text-gray-600 border-gray-500/30">Отменен</Badge>;
+      case 'failed':
+        return <Badge className="bg-red-500/20 text-red-600 border-red-500/30">Ошибка</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Icon name="Loader2" size={32} className="animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="space-y-8 animate-fade-in">
       <div className="text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 mb-4">
-          <Icon name="Wallet" size={32} className="text-white" />
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary mb-4">
+          <Icon name="CreditCard" size={32} className="text-white" />
         </div>
-        <h2 className="text-3xl font-bold mb-2">Оплата через СБП</h2>
+        <h2 className="text-3xl font-bold mb-2">Управление подпиской</h2>
         <p className="text-muted-foreground">
-          Быстрая и безопасная оплата через Систему Быстрых Платежей Сбербанка
+          Выберите тарифный план и управляйте своей подпиской
         </p>
       </div>
 
-      {!showQR ? (
-        <Card className="p-8">
-          <div className="space-y-6">
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <Icon name="Info" size={20} className="text-blue-600" />
-              <div className="text-sm text-blue-900 dark:text-blue-100">
-                <strong>Получатель:</strong> Сбербанк, тел. <strong>+7 927 748-68-68</strong>
+      {currentSubscription && (
+        <Card className="p-6 bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold">Текущий план</h3>
+              <div className="flex items-center gap-3">
+                <Badge className="bg-primary text-primary-foreground">
+                  {currentSubscription.plan_type === 'starter' ? 'Стартовый' : 
+                   currentSubscription.plan_type === 'professional' ? 'Профессиональный' : 'Корпоративный'}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  Активен до {formatDate(currentSubscription.end_date)}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Клиентов</p>
+                  <p className="font-semibold">
+                    {currentSubscription.max_clients === -1 ? '∞' : currentSubscription.max_clients}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Звонков/мес</p>
+                  <p className="font-semibold">
+                    {currentSubscription.max_calls_per_month === -1 ? '∞' : currentSubscription.max_calls_per_month}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Рассылок</p>
+                  <p className="font-semibold">
+                    {currentSubscription.max_email_campaigns === -1 ? '∞' : currentSubscription.max_email_campaigns}
+                  </p>
+                </div>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="amount">Сумма платежа (₽)</Label>
-              <Input
-                id="amount"
-                type="number"
-                placeholder="1000"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="text-lg"
-                min="1"
-                step="0.01"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Назначение платежа</Label>
-              <Input
-                id="description"
-                type="text"
-                placeholder="За что платим"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-
-            <Button
-              onClick={handleCreatePayment}
-              disabled={loading || !amount}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:opacity-90 text-lg h-12"
-            >
-              {loading ? (
-                <>
-                  <Icon name="Loader2" size={20} className="mr-2 animate-spin" />
-                  Создание QR-кода...
-                </>
-              ) : (
-                <>
-                  <Icon name="QrCode" size={20} className="mr-2" />
-                  Создать QR для оплаты
-                </>
-              )}
+            <Button variant="outline" onClick={handleCancelSubscription} className="border-red-500/50 hover:bg-red-500/10">
+              <Icon name="XCircle" size={16} className="mr-2" />
+              Отменить
             </Button>
           </div>
         </Card>
-      ) : (
-        <Card className="p-8">
-          <div className="space-y-6 text-center">
-            <div className="flex items-center justify-center gap-2 text-green-600">
-              <Icon name="CheckCircle" size={24} />
-              <h3 className="text-xl font-semibold">QR-код создан</h3>
-            </div>
+      )}
 
-            <div className="bg-white p-6 rounded-lg border-2 border-dashed border-gray-300 inline-block">
-              <img 
-                src={qrCode} 
-                alt="QR код для оплаты" 
-                className="w-64 h-64 mx-auto"
-              />
-            </div>
+      <div>
+        <h3 className="text-2xl font-bold mb-6">Тарифные планы</h3>
+        <PricingPlans 
+          currentPlan={currentSubscription?.plan_type} 
+          onPlanSelect={handleSelectPlan}
+        />
+      </div>
 
-            <div className="space-y-2 text-left bg-muted/50 p-4 rounded-lg">
-              <p className="text-sm">
-                <strong>Сумма:</strong> {amount} ₽
-              </p>
-              <p className="text-sm">
-                <strong>Назначение:</strong> {description}
-              </p>
-              <p className="text-sm">
-                <strong>ID платежа:</strong> {paymentId}
-              </p>
-              <p className="text-sm">
-                <strong>Получатель:</strong> +7 927 748-68-68 (Сбербанк)
-              </p>
-            </div>
-
-            <div className="space-y-4 pt-4">
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-left">
-                <Icon name="AlertCircle" size={20} className="text-yellow-600 mt-0.5" />
-                <div className="text-sm text-yellow-900 dark:text-yellow-100">
-                  <strong>Как оплатить:</strong>
-                  <ol className="list-decimal list-inside mt-2 space-y-1">
-                    <li>Откройте приложение банка с поддержкой СБП</li>
-                    <li>Отсканируйте QR-код камерой</li>
-                    <li>Подтвердите платеж</li>
-                  </ol>
+      {paymentHistory.length > 0 && (
+        <Card className="p-6">
+          <h3 className="text-xl font-bold mb-4">История платежей</h3>
+          <div className="space-y-3">
+            {paymentHistory.slice(0, 10).map((payment) => (
+              <div key={payment.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
+                <div>
+                  <p className="font-semibold">{payment.plan_type ? `Подписка: ${payment.plan_type}` : 'Платеж'}</p>
+                  <p className="text-sm text-muted-foreground">{formatDate(payment.created_at)}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="font-bold">
+                    {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: payment.currency }).format(parseFloat(payment.amount))}
+                  </span>
+                  {getStatusBadge(payment.status)}
                 </div>
               </div>
-
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleDownloadQR}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Icon name="Download" size={16} className="mr-2" />
-                  Скачать QR-код
-                </Button>
-                <Button
-                  onClick={handleNewPayment}
-                  variant="default"
-                  className="flex-1 bg-gradient-to-r from-primary to-secondary"
-                >
-                  <Icon name="Plus" size={16} className="mr-2" />
-                  Новый платеж
-                </Button>
-              </div>
-            </div>
+            ))}
           </div>
         </Card>
       )}

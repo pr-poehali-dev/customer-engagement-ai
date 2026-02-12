@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import * as XLSX from 'xlsx';
+import { useSubscription } from '@/hooks/useSubscription';
 
 const API_URL = 'https://functions.poehali.dev/0c17e1a7-ce1b-49a9-9ef7-f7cb2df73405';
 
@@ -48,7 +49,14 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
   const [suggestingClientId, setSuggestingClientId] = useState<number | null>(null);
 
+  const { hasFeature } = useSubscription();
+
   const handleGetAiSuggestion = async (clientId: number) => {
+    if (!hasFeature('ai_suggestions')) {
+      alert('ИИ-рекомендации доступны только на тарифах Professional и Enterprise. Перейдите в раздел "Оплата" для обновления тарифа.');
+      return;
+    }
+
     setLoadingSuggestion(true);
     setSuggestingClientId(clientId);
     
