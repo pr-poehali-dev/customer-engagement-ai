@@ -18,6 +18,7 @@ interface Call {
   duration: string;
   recording_url?: string;
   transcript?: string;
+  notes?: string;
 }
 
 interface CallsTabProps {
@@ -99,6 +100,14 @@ export const CallsTab = ({ recentCalls, getStatusColor, onAnalyzeCall }: CallsTa
                     {call.result}
                   </Badge>
                 </div>
+                {call.notes && call.notes.includes('🤖 ИИ-анализ:') && (
+                  <div className="mb-2 p-2 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded border border-purple-500/20">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Icon name="Sparkles" size={12} className="text-purple-600" />
+                      Автоматический анализ готов
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-center gap-4 text-sm">
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <Icon name="Clock" size={14} />

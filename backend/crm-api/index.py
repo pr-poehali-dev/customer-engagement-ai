@@ -152,7 +152,8 @@ def get_calls(cursor):
     cursor.execute("""
         SELECT 
             c.id, c.client_id, c.status, c.duration, 
-            c.result, c.created_at,
+            c.result, c.created_at, c.recording_url, 
+            c.transcript, c.notes,
             cl.name as client_name, cl.phone as client_phone
         FROM calls c
         LEFT JOIN clients cl ON c.client_id = cl.id
@@ -412,12 +413,46 @@ def handle_mango_webhook(cursor, conn, body):
     if recording_url and call_state == 'Disconnected':
         # Получаем транскрипцию через MANGO OFFICE Speech API или сторонний сервис
         transcript = get_call_transcript(recording_url)
-        if transcript:
+        if transcript and transcript != 'Транскрипция доступна после настройки Yandex SpeechKit или альтернативного сервиса':
             cursor.execute("""
                 UPDATE calls 
                 SET transcript = %s
                 WHERE id = %s
             """, (transcript, call_id))
+            
+            # Автоматически запускаем ИИ-анализ звонка
+            cursor.execute("""
+                SELECT c.*, cl.name, cl.company, cl.email, cl.phone
+                FROM calls c
+                JOIN clients cl ON c.client_id = cl.id
+                WHERE c.id = %s
+            """, (call_id,))
+            
+            call_data = cursor.fetchone()
+            if call_data:
+                ai_analysis = call_yandex_gpt_agent(
+                    transcript=transcript,
+                    client_name=call_data['name'],
+                    company=call_data['company'],
+                    prompt=f"""Проанализируй звонок с клиентом {call_data['name']} из компании {call_data['company']}.
+                    
+Транскрипция разговора:
+{transcript}
+
+Выдели:
+1. Основную цель звонка
+2. Ключевые вопросы клиента
+3. Договоренности и следующие шаги
+4. Настроение клиента (заинтересован/нейтрален/недоволен)
+5. Рекомендации менеджеру"""
+                )
+                
+                # Сохраняем анализ в поле notes
+                cursor.execute("""
+                    UPDATE calls 
+                    SET notes = %s
+                    WHERE id = %s
+                """, (f"🤖 ИИ-анализ:\n{ai_analysis}", call_id))
     
     conn.commit()
     

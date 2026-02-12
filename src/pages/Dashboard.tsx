@@ -292,7 +292,7 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="calls">
-            <CallsTab recentCalls={recentCalls} />
+            <CallsTab recentCalls={recentCalls} getStatusColor={getStatusColor} />
           </TabsContent>
 
           <TabsContent value="emails">
