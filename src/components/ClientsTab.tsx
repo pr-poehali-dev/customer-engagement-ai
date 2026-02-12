@@ -7,15 +7,29 @@ import Icon from '@/components/ui/icon';
 import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import * as XLSX from 'xlsx';
 
+const API_URL = 'https://functions.poehali.dev/0c17e1a7-ce1b-49a9-9ef7-f7cb2df73405';
+
+interface Client {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  legalAddress?: string;
+  status: string;
+  last_contact: string;
+}
+
 interface ClientsTabProps {
-  clients: any[];
+  clients: Client[];
   getStatusColor: (status: string) => string;
   handleInitiateCall: (clientId: number, phone: string) => Promise<void>;
   callingInProgress: {[key: number]: boolean};
-  onImportClients: (clients: any[]) => void;
-  onEditClient: (client: any) => void;
+  onImportClients: (clients: Client[]) => void;
+  onEditClient: (client: Client) => void;
   onAddClient: () => void;
   onDeleteClient: (clientId: number) => void;
 }
@@ -23,8 +37,44 @@ interface ClientsTabProps {
 export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callingInProgress, onImportClients, onEditClient, onAddClient, onDeleteClient }: ClientsTabProps) => {
   const [importing, setImporting] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
-  const [selectedClients, setSelectedClients] = useState<any[]>([]);
+  const [selectedClients, setSelectedClients] = useState<Client[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<{
+    suggestion: string;
+    client: { name: string; company: string; email: string; phone: string; status: string };
+    calls_count: number;
+  } | null>(null);
+  const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+  const [suggestingClientId, setSuggestingClientId] = useState<number | null>(null);
+
+  const handleGetAiSuggestion = async (clientId: number) => {
+    setLoadingSuggestion(true);
+    setSuggestingClientId(clientId);
+    
+    try {
+      const response = await fetch(`${API_URL}?path=ai_suggest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAiSuggestion(data);
+        setSuggestionDialogOpen(true);
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Ошибка при получении рекомендаций');
+      }
+    } catch (error) {
+      console.error('Error getting AI suggestion:', error);
+      alert('Не удалось получить рекомендации ИИ');
+    } finally {
+      setLoadingSuggestion(false);
+      setSuggestingClientId(null);
+    }
+  };
 
   const downloadTemplate = () => {
     const templateData = [
@@ -58,7 +108,7 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      const parsedClients = jsonData.map((row: any, index: number) => ({
+      const parsedClients = jsonData.map((row: Record<string, unknown>, index: number) => ({
         id: Date.now() + index,
         name: row['Имя'] || row['Name'] || row['ФИО'] || '',
         email: row['Email'] || row['Почта'] || row['E-mail'] || '',
@@ -193,6 +243,16 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
                   <Button 
                     variant="ghost" 
                     size="icon"
+                    onClick={() => handleGetAiSuggestion(client.id)}
+                    disabled={loadingSuggestion && suggestingClientId === client.id}
+                    className="hover:bg-purple-500/20 hover:text-purple-600"
+                    title="ИИ-рекомендация"
+                  >
+                    <Icon name={loadingSuggestion && suggestingClientId === client.id ? "Loader2" : "Sparkles"} size={16} className={loadingSuggestion && suggestingClientId === client.id ? 'animate-spin' : ''} />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
                     onClick={() => handleInitiateCall(client.id, client.phone)}
                     disabled={callingInProgress[client.id]}
                     className="hover:bg-green-500/20 hover:text-green-600"
@@ -232,6 +292,58 @@ export const ClientsTab = ({ clients, getStatusColor, handleInitiateCall, callin
           alert(`Рассылка завершена!\n✅ Отправлено: ${result.sent}\n❌ Ошибок: ${result.failed}\n\n📧 Отчет отправлен на zakaz6377@yandex.ru`);
         }}
       />
+
+      <Dialog open={suggestionDialogOpen} onOpenChange={setSuggestionDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="Sparkles" size={20} className="text-purple-600" />
+              ИИ-рекомендации по клиенту
+            </DialogTitle>
+            <DialogDescription>
+              {aiSuggestion?.client && (
+                <span>Клиент: {aiSuggestion.client.name} ({aiSuggestion.client.company})</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {aiSuggestion && (
+            <div className="space-y-4">
+              <Card className="p-4 bg-muted/30">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground mb-1">Статус</p>
+                    <Badge className={getStatusColor(aiSuggestion.client.status)}>
+                      {aiSuggestion.client.status === 'hot' ? 'Горячий' : aiSuggestion.client.status === 'warm' ? 'Теплый' : 'Холодный'}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-1">Звонков в истории</p>
+                    <p className="font-semibold">{aiSuggestion.calls_count}</p>
+                  </div>
+                </div>
+              </Card>
+
+              <div className="prose prose-sm max-w-none">
+                <div className="whitespace-pre-wrap bg-card p-4 rounded-lg border">
+                  {aiSuggestion.suggestion}
+                </div>
+              </div>
+
+              <Card className="p-4 bg-primary/5">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Icon name="User" size={16} />
+                  Контактная информация
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-muted-foreground">Email:</span> {aiSuggestion.client.email}</p>
+                  <p><span className="text-muted-foreground">Телефон:</span> {aiSuggestion.client.phone}</p>
+                </div>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
